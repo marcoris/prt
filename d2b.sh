@@ -17,7 +17,7 @@ fi
 echo -e "${BLUE}"
 echo "============================================"
 echo "         domains2burp - d2b.sh"
-echo "            Version 0.0.2"
+echo "            Version 0.0.3"
 echo "         Created by SirOcram aka 0xFF00FF"
 echo "============================================"
 echo -e "${NC}"
@@ -57,17 +57,21 @@ then
     exit 2
 fi
 
-# Gather subdomains and save to $domain_domains
-echo -e "${BLUE}[*]${NC} Gathering subdomains with assetfinder for ${YELLOW}$domain${NC}..."
-assetfinder --subs-only $domain > "$domain_domains"
+# Gather subdomains and save to $domain_domains, unless file exists and is not overwritten
+if [ ! -f "$domain_domains" ] || [[ "$choice" =~ ^[yY]$ ]]; then
+    echo -e "${BLUE}[*]${NC} Gathering subdomains with assetfinder for ${YELLOW}$domain${NC}..."
+    assetfinder --subs-only $domain > "$domain_domains"
 
-# Check if $domain_domains was created and has content
-if [ ! -s "$domain_domains" ]; then
-    echo -e "${RED}[!]${NC} Error: No subdomains found or $domain_domains is empty."
-    exit 3
+    # Check if $domain_domains was created and has content
+    if [ ! -s "$domain_domains" ]; then
+        echo -e "${RED}[!]${NC} Error: No subdomains found or $domain_domains is empty."
+        exit 3
+    fi
+
+    echo -e "${GREEN}[+]${NC} Subdomains successfully saved to $domain_domains."
+else
+    echo -e "${GREEN}[+]${NC} Skipping subdomain gathering since $domain_domains already exists."
 fi
-
-echo -e "${GREEN}[+]${NC} Subdomains successfully saved to $domain_domains."
 
 # Filter reachable domains with httprobe and save to $domain_live_domains
 echo -e "${BLUE}[*]${NC} Checking reachable subdomains with httprobe..."
