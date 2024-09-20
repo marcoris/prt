@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Farben definieren
+# Define colors
 GREEN="\033[0;32m"
 YELLOW="\033[1;33m"
 RED="\033[0;31m"
@@ -13,7 +13,7 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
-# Banner anzeigen
+# Display banner
 echo -e "${BLUE}"
 echo "============================================"
 echo "         domains2burp - d2b.sh"
@@ -26,7 +26,7 @@ domain="$1"
 domain_domains="${domain}_domains.txt"
 domain_live_domains="${domain}_live_domains.txt"
 
-# Überprüfen, ob die domains.txt existiert
+# Check if the domains file exists
 if [ -f "$domain_domains" ]; then
     read -p "File $domain_domains already exists. Do you want to overwrite it? (y/n): " choice
     case "$choice" in 
@@ -37,22 +37,19 @@ if [ -f "$domain_domains" ]; then
 fi
 
 # Check if assetfinder is installed
-if ! command -v assetfinder &> /dev/null
-then
+if ! command -v assetfinder &> /dev/null; then
     echo -e "${RED}[!]${NC} Error: assetfinder is not installed. Please install it first."
     exit 2
 fi
 
 # Check if httprobe is installed
-if ! command -v httprobe &> /dev/null
-then
+if ! command -v httprobe &> /dev/null; then
     echo -e "${RED}[!]${NC} Error: httprobe is not installed. Please install it first."
     exit 2
 fi
 
 # Check if curl is installed
-if ! command -v curl &> /dev/null
-then
+if ! command -v curl &> /dev/null; then
     echo -e "${RED}[!]${NC} Error: curl is not installed. Please install it first."
     exit 2
 fi
@@ -60,7 +57,7 @@ fi
 # Gather subdomains and save to $domain_domains, unless file exists and is not overwritten
 if [ ! -f "$domain_domains" ] || [[ "$choice" =~ ^[yY]$ ]]; then
     echo -e "${BLUE}[*]${NC} Gathering subdomains with assetfinder for ${YELLOW}$domain${NC}..."
-    assetfinder --subs-only $domain > "$domain_domains"
+    assetfinder --subs-only $domain | sort -u > "$domain_domains"  # Sort and remove duplicates
 
     # Check if $domain_domains was created and has content
     if [ ! -s "$domain_domains" ]; then
@@ -76,25 +73,28 @@ fi
 # Filter reachable domains with httprobe and save to $domain_live_domains
 echo -e "${BLUE}[*]${NC} Checking reachable subdomains with httprobe..."
 
-# Anzahl der Domains zählen
+# Count the number of domains
 total_domains=$(wc -l < "$domain_domains")
 count=0
 
-# Fortschrittsbalken-Schleife
+# Clear live_domains.txt before writing
+> "$domain_live_domains"
+
+# Progress bar loop
 while read -r domain; do
     count=$((count + 1))
     percentage=$((100 * count / total_domains))
 
-    # Zeige den Fortschrittsbalken an
+    # Display the progress bar
     printf "\r                                                                                                                                                   "
     printf "\r${BLUE}[*]${NC} Testing domain $count of $total_domains: $domain - Percentage: [${GREEN}%d%%${NC}]" "$percentage"
 
-    # Prüfe, ob die Domain erreichbar ist (keine Ausgabe im Terminal)
+    # Check if the domain is reachable (no output in terminal)
     echo $domain | httprobe >> "$domain_live_domains"
 
 done < "$domain_domains"
 
-# Zeilenumbruch nach dem Fortschritt
+# New line after the progress
 echo -e "\n${GREEN}[+]${NC} Reachable domains successfully saved to $domain_live_domains."
 
 # Check if $domain_live_domains was created and has content
