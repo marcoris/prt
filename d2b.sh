@@ -6,6 +6,7 @@ YELLOW="\033[1;33m"
 RED="\033[0;31m"
 BLUE="\033[0;34m"
 NC="\033[0m" # No Color
+VERSION="0.0.4"
 
 # Check if a domain argument was passed
 if [ -z "$1" ]; then
@@ -17,7 +18,7 @@ fi
 echo -e "${BLUE}"
 echo "============================================"
 echo "         domains2burp - d2b.sh"
-echo "            Version 0.0.3"
+echo "            Version $VERSION"
 echo "         Created by SirOcram aka 0xFF00FF"
 echo "============================================"
 echo -e "${NC}"
@@ -115,7 +116,7 @@ echo -e "${BLUE}[*]${NC} Sending reachable domains to Burp Suite Proxy using cur
 
 for domain in $(cat "$domain_live_domains"); do
     echo -e "${YELLOW}[+]${NC} Testing $domain"
-    curl -x $proxy_url -k $domain
+    curl -s -x $proxy_url -k $domain > /dev/null
 done
 
 echo -e "${GREEN}[+]${NC} All domains were successfully sent to the proxy."
