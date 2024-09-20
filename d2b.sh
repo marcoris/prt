@@ -1,11 +1,12 @@
 #!/bin/bash
 
 # Define colors
-GREEN="\033[0;32m"
+GREEN="\033[1;32m"
 YELLOW="\033[1;33m"
-RED="\033[0;31m"
-BLUE="\033[0;34m"
+RED="\033[1;31m"
+FUCHSIA="\033[1;35m"
 NC="\033[0m" # No Color
+
 VERSION="0.0.4"
 
 # Check if a domain argument was passed
@@ -15,7 +16,7 @@ if [ -z "$1" ]; then
 fi
 
 # Display banner
-echo -e "${BLUE}"
+echo -e "${FUCHSIA}"
 echo "============================================"
 echo "         domains2burp - d2b.sh"
 echo "            Version $VERSION"
@@ -31,7 +32,7 @@ domain_live_domains="${domain}_live_domains.txt"
 if [ -f "$domain_domains" ]; then
     read -p "File $domain_domains already exists. Do you want to overwrite it? (y/n): " choice
     case "$choice" in 
-        y|Y ) echo -e "${BLUE}[*]${NC} Overwriting $domain_domains...";;
+        y|Y ) echo -e "${FUCHSIA}[*]${NC} Overwriting $domain_domains...";;
         n|N ) echo -e "${YELLOW}[+]${NC} Keeping existing file $domain_domains.";;
         * ) echo -e "${RED}[!]${NC} Invalid choice."; exit 1;;
     esac
@@ -57,7 +58,7 @@ fi
 
 # Gather subdomains and save to $domain_domains, unless file exists and is not overwritten
 if [ ! -f "$domain_domains" ] || [[ "$choice" =~ ^[yY]$ ]]; then
-    echo -e "${BLUE}[*]${NC} Gathering subdomains with assetfinder for ${YELLOW}$domain${NC}..."
+    echo -e "${FUCHSIA}[*]${NC} Gathering subdomains with assetfinder for ${YELLOW}$domain${NC}..."
     assetfinder --subs-only $domain | sort -u > "$domain_domains"  # Sort and remove duplicates
 
     # Check if $domain_domains was created and has content
@@ -72,7 +73,7 @@ else
 fi
 
 # Filter reachable domains with httprobe and save to $domain_live_domains
-echo -e "${BLUE}[*]${NC} Checking reachable subdomains with httprobe..."
+echo -e "${FUCHSIA}[*]${NC} Checking reachable subdomains with httprobe..."
 
 # Count the number of domains
 total_domains=$(wc -l < "$domain_domains")
@@ -88,7 +89,7 @@ while read -r domain; do
 
     # Display the progress bar
     printf "\r                                                                                                                                                   "
-    printf "\r${BLUE}[*]${NC} Testing domain $count of $total_domains: $domain - Percentage: [${GREEN}%d%%${NC}]" "$percentage"
+    printf "\r${FUCHSIA}[*]${NC} Testing domain $count of $total_domains: $domain - Percentage: [${GREEN}%d%%${NC}]" "$percentage"
 
     # Check if the domain is reachable (no output in terminal)
     echo $domain | httprobe >> "$domain_live_domains"
@@ -112,7 +113,7 @@ if ! curl -s --head --request GET $proxy_url | grep "200 OK" > /dev/null; then
 fi
 
 # Send reachable domains to Burp Suite proxy using curl
-echo -e "${BLUE}[*]${NC} Sending reachable domains to Burp Suite Proxy using curl..."
+echo -e "${FUCHSIA}[*]${NC} Sending reachable domains to Burp Suite Proxy using curl..."
 
 for domain in $(cat "$domain_live_domains"); do
     echo -e "${YELLOW}[+]${NC} Testing $domain"
