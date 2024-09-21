@@ -89,7 +89,7 @@ while read -r domain; do
 
     # Display the progress bar
     printf "\r                                                                                                                                                   "
-    printf "\r${FUCHSIA}[*]${NC} Testing domain $count of $total_domains: $domain - Percentage: [${GREEN}%d%%${NC}]" "$percentage"
+    printf "\r${FUCHSIA}[*]${NC} Testing domain $count/$total_domains: $domain - Percentage: [${GREEN}%d%%${NC}]" "$percentage"
 
     # Check if the domain is reachable (no output in terminal)
     echo $domain | httprobe >> "$domain_live_domains"
@@ -115,8 +115,13 @@ fi
 # Send reachable domains to Burp Suite proxy using curl
 echo -e "${FUCHSIA}[*]${NC} Sending reachable domains to Burp Suite Proxy using curl..."
 
+# Count the number of live domains
+total_live_domains=$(wc -l < "$domain_live_domains")
+count=0
+
 for domain in $(cat "$domain_live_domains"); do
-    echo -e "${YELLOW}[+]${NC} Testing $domain"
+    count=$((count + 1))
+    echo -e "${YELLOW}[+]${NC} Testing domain $count/$total_live_domains: $domain"
     curl -s -x $proxy_url -k $domain > /dev/null
 done
 
