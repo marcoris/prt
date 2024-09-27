@@ -1,6 +1,14 @@
 # ptf.sh
 ## Pentesting Framework
-This script runns `assetfinder` (thanks [https://github.com/tomnomnom](tomnomnom)) and save live_domains after checking with `httprobe` (also thanks [https://github.com/tomnomnom](tomnomnom)). After the live_domains.txt is saved it will send it to the Burp proxy `127.0.0.1:8080` to list in the sitemap.
+1. Run all
+2. Get all subdomains (assetfinder)
+3. Check for live domains (httprobe)
+4. Handle redirects
+5. Import in Burp
+6. Take screenshots
+7. Get open ports
+8. Cleanup files
+9. Exit
 
 ## Usage
 ```bash
