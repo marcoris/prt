@@ -266,8 +266,8 @@ while true; do
             get_amass_subdirectories
             check_live_domains
             handle_redirects
-            import_in_burp
             take_screenshots
+            import_in_burp
             get_open_ports
             ;;
         2)
