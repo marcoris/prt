@@ -263,6 +263,7 @@ while true; do
     case $option in
         a)
             get_subdomains
+            get_amass_subdirectories
             check_live_domains
             handle_redirects
             import_in_burp
@@ -271,6 +272,7 @@ while true; do
             ;;
         2)
             get_subdomains
+            get_amass_subdirectories
             ;;
         3)
             check_live_domains
