@@ -6,26 +6,27 @@ YELLOW="\033[1;33m"
 RED="\033[1;31m"
 FUCHSIA="\033[1;35m"
 BLUE="\033[1;34m"
-
 NC="\033[0m" # No Color
 
 # Variables
-VERSION="0.0.5"
-CUSTOM_HEADER="Pentester SirOcram: Bugbounty - Switzerland"
+VERSION="0.0.8"
 
 # Check if a domain argument was passed
 if [ -z "$1" ]; then
-    echo -e "${RED}[!]${NC} Error: No domain provided. Example usage: ./ptf.sh example.com"
+    echo -e "${RED}[!]${NC} Error: No domain provided. Example usage: $0 example.com"
     exit 1
 fi
 
-# Domain argument
-target="domains/$1"
-target_sub_domains="${target}_sub_domains.txt"
-target_live_domains="${target}_live_domains.txt"
-target_protocol_domains="${target}_live_protocol_domains.txt"
-target_redirect_domains="${target}_redirect_domains.txt"
+# Domain arguments
+target="$1"
+target_domains="domains/${target}/"
+target_sub_domains="${target_domains}sub_domains.txt"
+target_live_domains="${target_domains}live_domains.txt"
+target_redirect_domains="${target_domains}redirect_domains.txt"
+screenshots="screenshots/${target}/"
 proxy_url="http://127.0.0.1:8080"
+
+mkdir -p "$target_domains"
 
 # Display banner
 display_banner() {
@@ -35,12 +36,14 @@ display_banner() {
     echo "            Version $VERSION"
     echo "         Created by SirOcram aka 0xFF00FF"
     echo -e "        For domain: ${YELLOW}$target${NC}"
+    echo -e "${FUCHSIA}"
     echo "============================================"
     echo -e "${NC}"
 }
 
 # Function: Get all subdomains
 get_subdomains() {
+    # Assetfinder
     if ! command -v assetfinder &> /dev/null; then
         echo -e "${RED}[!]${NC} Error: assetfinder is not installed. Please install it first."
         return 1
@@ -48,8 +51,54 @@ get_subdomains() {
     echo -e "${BLUE}[i]${NC} Passive scan..."
     echo -e "${FUCHSIA}[*]${NC} Gathering subdomains with assetfinder for ${YELLOW}$target${NC}..."
     assetfinder --subs-only "$target" | sort -u > "$target_sub_domains"
+    
+    # Subfinder
+    if ! command -v subfinder &> /dev/null; then
+        echo -e "${RED}[!]${NC} Error: subfinder is not installed. Please install it first."
+        return 1
+    fi
+    echo -e "${BLUE}[i]${NC} Passive scan..."
+    echo -e "${FUCHSIA}[*]${NC} Gathering subdomains with subfinder for ${YELLOW}$target${NC}..."
+    subfinder -d "$target" -all -active -timeout 10 -silent | sort -u >> "$target_sub_domains"
+    
     total_domains=$(wc -l < "$target_sub_domains")
     echo -e "${GREEN}[+]${NC} $total_domains subdomains saved to $target_sub_domains"
+}
+
+# Amass subdirectoryfinder
+get_amass_subdirectories() {
+    if ! command -v amass &> /dev/null; then
+        echo -e "${RED}[!]${NC} Error: amass is not installed. Please install it first."
+        return 1
+    fi
+    echo -e "${BLUE}[i]${NC} Passive scan..."
+    echo -e "${FUCHSIA}[*]${NC} Gathering subdomains with amass for ${YELLOW}$target${NC}..."
+
+    if ! amass enum -o "${target_domains}/amass.txt" -d "$target" src; then
+        echo -e "${RED}[!]${NC} Error: amass scan failed."
+        return 1
+    fi
+    
+    # Cleaning up ANSI codes
+    text=$(cat "${target_domains}/amass.txt")
+    clean_txt=$(remove_ansi_codes "$text")
+
+    echo "$clean_txt" > "${target_domains}/amass.txt"
+    echo "${GREEN}[+]${NC} Clean text saved to ${target_domains}/amass.txt"
+    
+    # Append the findings to the subdomains
+    cat "${target_domains}/amass.txt" | sort -u >> "$target_sub_domains"
+    
+    # Sort all together
+    sort -u "$target_sub_domains" -o "$target_sub_domains"
+    
+    echo -e "${GREEN}[+]${NC} Subdomains gathered and sorted in $target_sub_domains."
+}
+
+# Cleanup ANSI codes function
+remove_ansi_codes() {
+    local input_text="$1"
+    echo "$input_text" | awk '{gsub(/\x1b\[[0-9;]*[a-zA-Z]/, "")}1'
 }
 
 # Function: Check for live domains
@@ -148,12 +197,12 @@ take_screenshots() {
     fi
     echo -e "${BLUE}[i]${NC} Passive scan..."
     echo -e "${FUCHSIA}[*]${NC} Taking screenshots of live domains with gowitness..."
-    gowitness --disable-db file -f "$target_live_domains"
+    gowitness --disable-db -P "$screenshots" file -f "$target_live_domains"
     
     echo -e "${BLUE}[i]${NC} Passive scan..."
     echo -e "${FUCHSIA}[*]${NC} Taking screenshots of redirected domains with gowitness..."
-    gowitness --disable-db file -f "$target_redirect_domains"
-    total_files=$(ls -1 "screenshots" | wc -l)
+    gowitness --disable-db -P "$screenshots" file -f "$target_redirect_domains"
+    total_files=$(ls -1 "$screenshots" | wc -l)
     echo -e "${BLUE}[i]${NC} $total_files screenshots were made."
 }
 
@@ -180,7 +229,7 @@ get_open_ports() {
 # Function to clean up files
 cleanup() {
      # Define the pattern to match files with prefix $target_
-    pattern="${target}_*"
+    pattern="${target_domains}*"
 
     echo -e "${YELLOW}[*]${NC} Cleaning up files for target: ${YELLOW}$target${NC}..."
 
@@ -203,8 +252,8 @@ while true; do
     echo "2. Get all subdomains (assetfinder)"
     echo "3. Check for live domains (httprobe)"
     echo "4. Handle redirects"
-    echo "5. Import in Burp"
-    echo "6. Take screenshots"
+    echo "5. Take screenshots"
+    echo "6. Import in Burp"
     echo "7. Get open ports"
     echo "8. Cleanup files"
     echo "x. Exit"
@@ -230,10 +279,10 @@ while true; do
             handle_redirects
             ;;
         5)
-            import_in_burp
+            take_screenshots
             ;;
         6)
-            take_screenshots
+            import_in_burp
             ;;
         7)
             get_open_ports
