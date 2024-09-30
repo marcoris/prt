@@ -23,7 +23,7 @@ target_domains="domains/${target}/"
 target_sub_domains="${target_domains}sub_domains.txt"
 target_live_domains="${target_domains}live_domains.txt"
 target_redirect_domains="${target_domains}redirect_domains.txt"
-screenshots="screenshots/${target}/"
+screenshots="screenshots/${target}"
 proxy_url="http://127.0.0.1:8080"
 
 mkdir -p "$target_domains"
@@ -73,21 +73,23 @@ get_amass_subdirectories() {
     fi
     echo -e "${BLUE}[i]${NC} Passive scan..."
     echo -e "${FUCHSIA}[*]${NC} Gathering subdomains with amass for ${YELLOW}$target${NC}..."
-
-    if ! amass enum -o "${target_domains}/amass.txt" -d "$target" src; then
-        echo -e "${RED}[!]${NC} Error: amass scan failed."
-        return 1
-    fi
+    amass enum -passive -o "${target_domains}amass.txt" -d "$target"
     
     # Cleaning up ANSI codes
-    text=$(cat "${target_domains}/amass.txt")
+    text=$(cat "${target_domains}amass.txt")
     clean_txt=$(remove_ansi_codes "$text")
 
-    echo "$clean_txt" > "${target_domains}/amass.txt"
-    echo "${GREEN}[+]${NC} Clean text saved to ${target_domains}/amass.txt"
+    echo "$clean_txt" > "${target_domains}amass.txt"
+    echo -e "${GREEN}[+]${NC} Clean text saved to ${target_domains}amass.txt"
+    
+    echo -e "${FUCHSIA}[*]${NC} Getting subdomains from ${target_domains}amass.txt"
+    grep -oP '(?<= --> )([a-zA-Z0-9.-]+\.jura\.ch)' "${target_domains}amass.txt" > "${target_domains}amass_subdomains.txt"
+    
+    # Sort amass subdomains
+    sort -u "${target_domains}amass_subdomains.txt" -o "${target_domains}amass_subdomains.txt"
     
     # Append the findings to the subdomains
-    cat "${target_domains}/amass.txt" | sort -u >> "$target_sub_domains"
+    cat "${target_domains}amass_subdomains.txt" | sort -u >> "$target_sub_domains"
     
     # Sort all together
     sort -u "$target_sub_domains" -o "$target_sub_domains"
@@ -189,19 +191,33 @@ import_in_burp() {
     echo -e "${GREEN}[+]${NC} $count domains were successfully sent to the proxy."
 }
 
+# Function remove screenshots
+remove_screenshots() {
+    echo -e "${RED}[!]${NC} Removing all screenshots from ${screenshots}."
+    rm -rf $screenshots
+    if [ ! -d $screenshots ]; then
+    	echo -e "${GREEN}[+]${NC} Screenshots are successfully removed."
+    fi
+}
+
 # Function: Take screenshots
 take_screenshots() {
     if ! command -v gowitness &> /dev/null; then
         echo -e "${RED}[!]${NC} Error: gowitness is not installed. Please install it first."
         return 1
     fi
+    if [ ! -d $screenshots ]; then
+    	echo -e "${GREEN}[+]${NC} making missing screenshots directory under: ${screenshots}."
+	mkdir -p $screenshots
+    fi
     echo -e "${BLUE}[i]${NC} Passive scan..."
     echo -e "${FUCHSIA}[*]${NC} Taking screenshots of live domains with gowitness..."
-    gowitness --disable-db -P "$screenshots" file -f "$target_live_domains"
+    gowitness scan file -f "$target_live_domains" -s "$screenshots"
     
     echo -e "${BLUE}[i]${NC} Passive scan..."
     echo -e "${FUCHSIA}[*]${NC} Taking screenshots of redirected domains with gowitness..."
-    gowitness --disable-db -P "$screenshots" file -f "$target_redirect_domains"
+    gowitness scan file -f "$target_redirect_domains" -s "$screenshots"
+    
     total_files=$(ls -1 "$screenshots" | wc -l)
     echo -e "${BLUE}[i]${NC} $total_files screenshots were made."
 }
@@ -249,13 +265,15 @@ while true; do
     display_banner
     # Menu
     echo "a. Run all"
-    echo "2. Get all subdomains (assetfinder)"
+    echo "1. Get all subdomains (assetfinder, subfinder)"
+    echo "2. Get amass subdomains (amass)"
     echo "3. Check for live domains (httprobe)"
     echo "4. Handle redirects"
-    echo "5. Take screenshots"
-    echo "6. Import in Burp"
-    echo "7. Get open ports"
-    echo "8. Cleanup files"
+    echo "5. Remove screenshots"
+    echo "6. Take screenshots (gowitness)"
+    echo "7. Import in Burp (burp/proxy)"
+    echo "8. Get open ports (nmap)"
+    echo "9. Cleanup files"
     echo "x. Exit"
     read -p "Select an option: " option
 
@@ -270,8 +288,10 @@ while true; do
             import_in_burp
             get_open_ports
             ;;
-        2)
+        1)
             get_subdomains
+            ;;
+        2)
             get_amass_subdirectories
             ;;
         3)
@@ -281,15 +301,18 @@ while true; do
             handle_redirects
             ;;
         5)
-            take_screenshots
+            remove_screenshots
             ;;
         6)
-            import_in_burp
+            take_screenshots
             ;;
         7)
-            get_open_ports
+            import_in_burp
             ;;
         8)
+            get_open_ports
+            ;;
+        9)
             cleanup
             ;;
         x)
