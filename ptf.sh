@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Variables
+VERSION="0.0.9"
+PORT="8080"
+proxy_url="http://127.0.0.1:${PORT}"
+
 # Define colors
 GREEN="\033[1;32m"
 YELLOW="\033[1;33m"
@@ -7,9 +12,6 @@ RED="\033[1;31m"
 FUCHSIA="\033[1;35m"
 BLUE="\033[1;34m"
 NC="\033[0m" # No Color
-
-# Variables
-VERSION="0.0.8"
 
 # Check if a domain argument was passed
 if [ -z "$1" ]; then
@@ -24,15 +26,18 @@ target_sub_domains="${target_domains}sub_domains.txt"
 target_live_domains="${target_domains}live_domains.txt"
 target_redirect_domains="${target_domains}redirect_domains.txt"
 screenshots="screenshots/${target}"
-proxy_url="http://127.0.0.1:8080"
+nmap="nmap/${target}"
 
+# Make directories
 mkdir -p "$target_domains"
+mkdir -p "${nmap}/"
 
 # Display banner
 display_banner() {
     echo -e "${FUCHSIA}"
     echo "============================================"
-    echo "         PenTestingFramework - ptf.sh"
+    echo ""
+    echo "         PenTestingFramework"
     echo "            Version $VERSION"
     echo "         Created by SirOcram aka 0xFF00FF"
     echo -e "        For domain: ${YELLOW}$target${NC}"
@@ -172,32 +177,23 @@ handle_redirects() {
 
 # Function: Import in Burp
 import_in_burp() {
-    if ! curl -s --head --request GET -H "$CUSTOM_HEADER" "$proxy_url" | grep "200 OK" > /dev/null; then
+    if ! curl -s --head --request GET "$proxy_url" | grep "200 OK" > /dev/null; then
         echo -e "${RED}[!]${NC} Warning: Burp Suite proxy at $proxy_url is not reachable."
         return 1
     fi
     echo -e "${BLUE}[i]${NC} Active scan with header $CUSTOM_HEADER..."
     echo -e "${FUCHSIA}[*]${NC} Sending reachable domains to Burp Suite Proxy using curl..."
 
-    total_live_domains=$(wc -l < "$target_redirect_domains")
+    total_live_domains=$(wc -l < "$target_live_domains")
     count=0
 
     for live_domain in $(cat "$target_live_domains"); do
         count=$((count + 1))
         echo -e "${YELLOW}[+]${NC} Sending domain $count/$total_live_domains: $live_domain"
-        curl -s -x "$proxy_url" -k -H "$CUSTOM_HEADER" "$live_domain" > /dev/null
+        curl -s -x "$proxy_url" -k "$live_domain" > /dev/null
     done
 
     echo -e "${GREEN}[+]${NC} $count domains were successfully sent to the proxy."
-}
-
-# Function remove screenshots
-remove_screenshots() {
-    echo -e "${RED}[!]${NC} Removing all screenshots from ${screenshots}."
-    rm -rf $screenshots
-    if [ ! -d $screenshots ]; then
-    	echo -e "${GREEN}[+]${NC} Screenshots are successfully removed."
-    fi
 }
 
 # Function: Take screenshots
@@ -229,34 +225,51 @@ get_open_ports() {
         return 1
     fi
     echo -e "${RED}[i]${NC} Active scan..."
-    echo -e "${FUCHSIA}[*]${NC} Scanning for open ports with nmap..."
+    echo -e "${FUCHSIA}[*]${NC} Scanning for open ports with nmap. This can take a while..."
     
-    # Loop through each live domain in the input file
+     # Loop through each live domain in the input file
     while read -r target; do
         # Use a safe filename by replacing unwanted characters
         safe_target=$(echo "$target" | tr -s '[:punct:]' '_' | tr ' ' '_')
     
         # Run Nmap scan and save output to a file named after the domain
-        sudo nmap -sS -sV -O -oN "${safe_target}_open_ports.txt" -vv -p- -T3 --script=default --open --min-rate=50 --max-retries=3 "$target"
-    done < "$target_live_domains"
-
+        sudo nmap -sS -sV -O -oN "${nmap}/${safe_target}_open_ports.txt" -vv -p- -T3 --script=default --open --min-rate=50 --max-retries=3 "$target"
+    done < "$target_sub_domains"
 }
 
 # Function to clean up files
-cleanup() {
+remove_domains() {
      # Define the pattern to match files with prefix $target_
     pattern="${target_domains}*"
 
-    echo -e "${YELLOW}[*]${NC} Cleaning up files for target: ${YELLOW}$target${NC}..."
+    echo -e "${YELLOW}[*]${NC} Cleaning up domains for target: ${YELLOW}$target${NC}..."
 
     # Remove files matching the pattern
     rm -f $pattern 2>/dev/null
 
     # Check if any files were deleted
     if [ $? -eq 0 ]; then
-        echo -e "${GREEN}[+]${NC} Removed all files."
+        echo -e "${GREEN}[+]${NC} Removed all domains."
     else
         echo -e "${RED}[!]${NC} No files found."
+    fi
+}
+
+# Function remove screenshots
+remove_screenshots() {
+    echo -e "${RED}[!]${NC} Removing all screenshots from ${screenshots}."
+    rm -rf $screenshots
+    if [ ! -d $screenshots ]; then
+    	echo -e "${GREEN}[+]${NC} Screenshots are successfully removed."
+    fi
+}
+
+# Function remove open ports
+remove_open_ports() {
+    echo -e "${RED}[!]${NC} Removing all open ports from ${nmap}."
+    rm -rf $nmap
+    if [ ! -d $nmap ]; then
+    	echo -e "${GREEN}[+]${NC} Open ports are successfully removed."
     fi
 }
 
@@ -266,20 +279,25 @@ while true; do
     # Menu
     echo "a. Run all"
     echo "1. Get all subdomains (assetfinder, subfinder)"
-    echo "2. Get amass subdomains (amass)"
+    echo "2. Get amass subdomains"
     echo "3. Check for live domains (httprobe)"
     echo "4. Handle redirects"
-    echo "5. Remove screenshots"
-    echo "6. Take screenshots (gowitness)"
-    echo "7. Import in Burp (burp/proxy)"
-    echo "8. Get open ports (nmap)"
-    echo "9. Cleanup files"
+    echo "5. Take screenshots (gowitness)"
+    echo "6. Import in Burp (burp/proxy)"
+    echo "7. Get open ports (nmap)"
+    echo "8. Cleanup all files (domains/screenshots)"
+    echo "9. Cleanup files (domains)"
+    echo "10. Cleanup screenshots"
+    echo "11. Cleanup open ports (nmap)"
     echo "x. Exit"
     read -p "Select an option: " option
 
     # Execute based on user selection
     case $option in
         a)
+            remove_domains
+            remove_screenshots
+            remove_open_ports
             get_subdomains
             get_amass_subdirectories
             check_live_domains
@@ -301,19 +319,26 @@ while true; do
             handle_redirects
             ;;
         5)
-            remove_screenshots
-            ;;
-        6)
             take_screenshots
             ;;
-        7)
+        6)
             import_in_burp
             ;;
-        8)
+        7)
             get_open_ports
             ;;
+        8)
+            remove_domains
+            remove_screenshots
+            ;;
         9)
-            cleanup
+            remove_domains
+            ;;
+        10)
+            remove_screenshots
+            ;;
+        11)
+            remove_open_ports
             ;;
         x)
             echo "Exiting..."
