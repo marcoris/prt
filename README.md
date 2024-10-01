@@ -1,4 +1,4 @@
-# ptf.sh - V0.0.9
+# ptf.sh - v 0.0.9
 ## Pentesting Framework
 a. Run all
 1. Get all subdomains (assetfinder, subfinder)
