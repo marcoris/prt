@@ -1,5 +1,6 @@
 # ptf.sh - v 0.0.9
 ## Pentesting Framework
+```
 a. Run all
 1. Get all subdomains (assetfinder, subfinder)
 2. Get amass subdomains
@@ -13,6 +14,7 @@ a. Run all
 10. Cleanup screenshots
 11. Cleanup open ports (nmap)
 x. Exit
+```
 
 ## Usage
 ```bash
