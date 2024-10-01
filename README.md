@@ -1,14 +1,18 @@
-# ptf.sh
+# ptf.sh - V0.0.9
 ## Pentesting Framework
-1. Run all
-2. Get all subdomains (assetfinder, subfinder, amass)
+a. Run all
+1. Get all subdomains (assetfinder, subfinder)
+2. Get amass subdomains
 3. Check for live domains (httprobe)
 4. Handle redirects
-5. Take screenshots
-6. Import in Burp
-8. Get open ports
-9. Cleanup files
-10. Exit
+5. Take screenshots (gowitness)
+6. Import in Burp (burp/proxy)
+7. Get open ports (nmap)
+8. Cleanup all files (domains/screenshots)
+9. Cleanup files (domains)
+10. Cleanup screenshots
+11. Cleanup open ports (nmap)
+x. Exit
 
 ## Usage
 ```bash
