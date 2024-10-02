@@ -30,7 +30,10 @@ nmap="nmap/${target}"
 
 # Make directories
 mkdir -p "$target_domains"
-mkdir -p "${nmap}/"
+mkdir -p "${nmap}/ports/"
+mkdir -p "${nmap}/hosts/"
+
+generate_gitignore
 
 # Display banner
 display_banner() {
@@ -233,8 +236,19 @@ get_open_ports() {
         safe_target=$(echo "$target" | tr -s '[:punct:]' '_' | tr ' ' '_')
     
         # Run Nmap scan and save output to a file named after the domain
-        sudo nmap -sS -sV -O -oN "${nmap}/${safe_target}_open_ports.txt" -vv -p- -T3 --script=default --open --min-rate=50 --max-retries=3 "$target"
+        sudo nmap -sS -sV -O -oN "${nmap}/ports/${safe_target}_open_ports.txt" -vv -p- -T3 --script=default --open --min-rate=50 --max-retries=3 "$target"
     done < "$target_sub_domains"
+}
+
+# Function for quick machine scan
+quick_machine_scan() {
+    # Get IP/range
+    echo -e "${FUCHSIA}[*]${NC} Quick scan for hosts with nmap."
+    echo -e "${YELLOW}[*]${NC} Insert IP/range: "
+    read iprange
+    safe_target=$(echo "$iprange" | tr -s '[:punct:]' '_' | tr ' ' '_')
+    
+    nmap -oN "${nmap}/hosts/${safe_target}_hosts.txt" -sn "$iprange"
 }
 
 # Function to clean up files
@@ -273,6 +287,13 @@ remove_open_ports() {
     fi
 }
 
+# Function to generate gitignore files
+generate_gitignore() {
+    echo "*/*" > "domains/.gitignore"
+    echo "*/*" > "screenshots/.gitignore"
+    echo "*/*" > "nmap/.gitignore"
+}
+
 # Loop to show menu after each task
 while true; do
     display_banner
@@ -284,11 +305,12 @@ while true; do
     echo "4. Handle redirects"
     echo "5. Take screenshots (gowitness)"
     echo "6. Import in Burp (burp/proxy)"
-    echo "7. Get open ports (nmap)"
-    echo "8. Cleanup all files (domains/screenshots)"
-    echo "9. Cleanup files (domains)"
-    echo "10. Cleanup screenshots"
-    echo "11. Cleanup open ports (nmap)"
+    echo "7. Quick host up check"
+    echo "8. Get open ports (nmap)"
+    echo "9. Cleanup all files (domains/screenshots)"
+    echo "10. Cleanup files (domains)"
+    echo "11. Cleanup screenshots"
+    echo "12. Cleanup open ports (nmap)"
     echo "x. Exit"
     read -p "Select an option: " option
 
@@ -325,19 +347,22 @@ while true; do
             import_in_burp
             ;;
         7)
-            get_open_ports
+            quick_machine_scan
             ;;
         8)
-            remove_domains
-            remove_screenshots
+            get_open_ports
             ;;
         9)
             remove_domains
-            ;;
-        10)
             remove_screenshots
             ;;
+        10)
+            remove_domains
+            ;;
         11)
+            remove_screenshots
+            ;;
+        12)
             remove_open_ports
             ;;
         x)
