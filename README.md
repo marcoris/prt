@@ -8,11 +8,12 @@ a. Run all
 4. Handle redirects
 5. Take screenshots (gowitness)
 6. Import in Burp (burp/proxy)
-7. Get open ports (nmap)
+7. Quick host up check (nmap)
+8. Get open ports (nmap)
 8. Cleanup all files (domains/screenshots)
 9. Cleanup files (domains)
 10. Cleanup screenshots
-11. Cleanup open ports (nmap)
+11. Cleanup open ports/hosts
 x. Exit
 ```
 
