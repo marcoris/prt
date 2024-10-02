@@ -21,12 +21,12 @@ fi
 
 # Domain arguments
 target="$1"
-target_domains="domains/${target}/"
+target_domains="../${target}/domains/${target}/"
 target_sub_domains="${target_domains}sub_domains.txt"
 target_live_domains="${target_domains}live_domains.txt"
 target_redirect_domains="${target_domains}redirect_domains.txt"
-screenshots="screenshots/${target}"
-nmap="nmap/${target}"
+screenshots="../${target}/screenshots/${target}"
+nmap="../${target}/nmap/${target}"
 
 # Make directories
 mkdir -p "$target_domains"
@@ -289,9 +289,9 @@ remove_open_ports() {
 
 # Function to generate gitignore files
 generate_gitignore() {
-    echo "*/*" > "domains/.gitignore"
-    echo "*/*" > "screenshots/.gitignore"
-    echo "*/*" > "nmap/.gitignore"
+    echo "*/*" > "../${target}/domains/.gitignore"
+    echo "*/*" > "../${target}/screenshots/.gitignore"
+    echo "*/*" > "../${target}/nmap/.gitignore"
 }
 
 # Loop to show menu after each task
