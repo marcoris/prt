@@ -1,4 +1,4 @@
-# ptf.sh - v 0.0.9
+# ptf.sh - v 1.0.0
 ## Pentesting Framework
 ```
 a. Run all
