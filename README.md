@@ -1,5 +1,5 @@
-# ptf.sh - v 1.0.0
-## Pentesting Framework
+# ptr.sh - v 1.0.0
+## PenTestRecon
 ```
 a. Run all
 1. Get all subdomains (assetfinder, subfinder)
@@ -19,5 +19,5 @@ x. Exit
 
 ## Usage
 ```bash
-./ptf.sh <url>
+./ptr.sh <url>
 ```
