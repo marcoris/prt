@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Variables
-VERSION="0.0.9"
+VERSION="1.0.0"
 PORT="8080"
 proxy_url="http://127.0.0.1:${PORT}"
 
@@ -305,12 +305,12 @@ while true; do
     echo "4. Handle redirects"
     echo "5. Take screenshots (gowitness)"
     echo "6. Import in Burp (burp/proxy)"
-    echo "7. Quick host up check"
+    echo "7. Quick host up check (nmap)"
     echo "8. Get open ports (nmap)"
     echo "9. Cleanup all files (domains/screenshots)"
     echo "10. Cleanup files (domains)"
     echo "11. Cleanup screenshots"
-    echo "12. Cleanup open ports (nmap)"
+    echo "12. Cleanup open ports/hosts"
     echo "x. Exit"
     read -p "Select an option: " option
 
