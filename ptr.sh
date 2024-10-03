@@ -21,12 +21,12 @@ fi
 
 # Domain arguments
 target="$1"
-target_domains="../${target}/domains/${target}/"
+target_domains="../domains/${target}/"
 target_sub_domains="${target_domains}sub_domains.txt"
 target_live_domains="${target_domains}live_domains.txt"
 target_redirect_domains="${target_domains}redirect_domains.txt"
-screenshots="../${target}/screenshots/${target}"
-nmap="../${target}/nmap/${target}"
+screenshots="../screenshots/${target}"
+nmap="../nmap/${target}/"
 
 # Make directories
 mkdir -p "$target_domains"
