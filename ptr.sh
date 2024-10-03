@@ -27,6 +27,8 @@ target_live_domains="${target_domains}live_domains.txt"
 target_redirect_domains="${target_domains}redirect_domains.txt"
 screenshots="../screenshots/${target}"
 nmap="../nmap/${target}/"
+output_dir="${nmap}/ports"
+output_file="${output_dir}/open_ports.html"
 
 # Make directories
 mkdir -p "$target_domains"
@@ -91,7 +93,7 @@ get_amass_subdirectories() {
     echo -e "${GREEN}[+]${NC} Clean text saved to ${target_domains}amass.txt"
     
     echo -e "${FUCHSIA}[*]${NC} Getting subdomains from ${target_domains}amass.txt"
-    grep -oP '(?<= --> )([a-zA-Z0-9.-]+\.jura\.ch)' "${target_domains}amass.txt" > "${target_domains}amass_subdomains.txt"
+    grep -oP '(?<= --> )([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})' "${target_domains}amass.txt" > "${target_domains}amass_subdomains.txt"
     
     # Sort amass subdomains
     sort -u "${target_domains}amass_subdomains.txt" -o "${target_domains}amass_subdomains.txt"
@@ -240,6 +242,64 @@ get_open_ports() {
     done < "$target_sub_domains"
 }
 
+
+# Function to generate html output from open ports
+generate_html_open_ports() {
+	# Start the HTML header and table structure
+	echo "<html>" > "$output_file"
+	echo "<head><title>Nmap Scan Results from ${target}</title></head>" >> "$output_file"
+	echo "<body>" >> "$output_file"
+	echo "<h1>Nmap Scan Results from ${target}</h1>" >> "$output_file"
+
+	# Loop through the files for open ports and format the output as HTML
+	grep -r -h "open " "$output_dir" | while read -r line; do
+	    # Extract the full URL (e.g., subdomain.domain.ch) using a generic regex
+	    current_url=$(echo "$line" | grep -oP "\b[a-zA-Z0-9.-]+\.${target}\b")
+
+	    # Remove the domain part to display only the subdomain
+	    subdomain=$(echo "$current_url" | sed "s/\.${target}$//")
+
+	    # If a new subdomain is found, close the previous subdomain's table
+	    if [[ -n "$current_url" ]]; then
+		# Close the previous subdomain's table and start a new one
+		if [[ -n "$previous_url" ]]; then
+		    echo "</table>" >> "$output_file"
+		    echo "<br>" >> "$output_file"
+		fi
+
+		# Write the new subdomain as a heading and start a new table
+		echo "<h2>$subdomain.$target</h2>" >> "$output_file"
+		echo "<table border='1' cellpadding='5'>" >> "$output_file"
+		echo "<tr><th>Port</th><th>Service</th><th>Reason</th><th>Version</th></tr>" >> "$output_file"
+		
+		previous_url="$current_url"
+	    fi
+
+	    # Add ports to the table and extract service, reason, and version
+	    port_line=$(echo "$line" | grep -P '^\d+/tcp\s+open')
+	    if [[ -n "$port_line" ]]; then
+		port=$(echo "$port_line" | awk '{print $1}')
+		service=$(echo "$port_line" | awk '{print $3}')  # Service instead of "open"
+		reason=$(echo "$port_line" | awk '{print $4, $5, $6}')
+		version=$(echo "$port_line" | awk '{for(i=7;i<=NF;i++) printf $i" "; print ""}')
+
+		# Add the information to the table
+		echo "<tr><td>$port</td><td>$service</td><td>$reason</td><td>$version</td></tr>" >> "$output_file"
+	    fi
+	done
+
+	# Close the last subdomain's table
+	if [[ -n "$previous_url" ]]; then
+	    echo "</table>" >> "$output_file"
+	fi
+
+	# Close the HTML structure
+	echo "</body>" >> "$output_file"
+	echo "</html>" >> "$output_file"
+
+	echo "HTML output has been saved to $output_file."
+}
+
 # Function for quick machine scan
 quick_machine_scan() {
     # Get IP/range
@@ -307,10 +367,11 @@ while true; do
     echo "6. Import in Burp (burp/proxy)"
     echo "7. Quick host up check (nmap)"
     echo "8. Get open ports (nmap)"
-    echo "9. Cleanup all files (domains/screenshots)"
-    echo "10. Cleanup files (domains)"
-    echo "11. Cleanup screenshots"
-    echo "12. Cleanup open ports/hosts"
+    echo "9. Generate HTML output of open ports"
+    echo "10. Cleanup all files (domains/screenshots)"
+    echo "11. Cleanup files (domains)"
+    echo "12. Cleanup screenshots"
+    echo "13. Cleanup open ports/hosts"
     echo "x. Exit"
     read -p "Select an option: " option
 
@@ -327,6 +388,7 @@ while true; do
             take_screenshots
             import_in_burp
             get_open_ports
+            generate_html_open_ports
             ;;
         1)
             get_subdomains
@@ -353,16 +415,19 @@ while true; do
             get_open_ports
             ;;
         9)
-            remove_domains
-            remove_screenshots
+            generate_html_open_ports
             ;;
         10)
             remove_domains
-            ;;
-        11)
             remove_screenshots
             ;;
+        11)
+            remove_domains
+            ;;
         12)
+            remove_screenshots
+            ;;
+        13)
             remove_open_ports
             ;;
         x)
