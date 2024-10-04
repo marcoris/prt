@@ -10,10 +10,11 @@ a. Run all
 6. Import in Burp (burp/proxy)
 7. Quick host up check (nmap)
 8. Get open ports (nmap)
-8. Cleanup all files (domains/screenshots)
-9. Cleanup files (domains)
-10. Cleanup screenshots
-11. Cleanup open ports/hosts
+9. Generate HTML output of open ports
+10. Cleanup all files (domains/screenshots)
+11. Cleanup files (domains)
+12. Cleanup screenshots
+13. Cleanup open ports/hosts
 x. Exit
 ```
 
