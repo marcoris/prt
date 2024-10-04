@@ -252,52 +252,39 @@ generate_html_open_ports() {
 	echo "<h1>Nmap Scan Results from ${target}</h1>" >> "$output_file"
 
 	# Loop through the files for open ports and format the output as HTML
-	grep -r -h "open " "$output_dir" | while read -r line; do
-	    # Extract the full URL (e.g., subdomain.domain.ch) using a generic regex
-	    current_url=$(echo "$line" | grep -oP "\b[a-zA-Z0-9.-]+\.${target}\b")
-
-	    # Remove the domain part to display only the subdomain
-	    subdomain=$(echo "$current_url" | sed "s/\.${target}$//")
-
-	    # If a new subdomain is found, close the previous subdomain's table
-	    if [[ -n "$current_url" ]]; then
-		# Close the previous subdomain's table and start a new one
-		if [[ -n "$previous_url" ]]; then
-		    echo "</table>" >> "$output_file"
-		    echo "<br>" >> "$output_file"
-		fi
-
-		# Write the new subdomain as a heading and start a new table
-		echo "<h2>$subdomain.$target</h2>" >> "$output_file"
-		echo "<table border='1' cellpadding='5'>" >> "$output_file"
-		echo "<tr><th>Port</th><th>Service</th><th>Reason</th><th>Version</th></tr>" >> "$output_file"
-		
-		previous_url="$current_url"
-	    fi
-
-	    # Add ports to the table and extract service, reason, and version
-	    port_line=$(echo "$line" | grep -P '^\d+/tcp\s+open')
-	    if [[ -n "$port_line" ]]; then
-		port=$(echo "$port_line" | awk '{print $1}')
-		service=$(echo "$port_line" | awk '{print $3}')  # Service instead of "open"
-		reason=$(echo "$port_line" | awk '{print $4, $5, $6}')
-		version=$(echo "$port_line" | awk '{for(i=7;i<=NF;i++) printf $i" "; print ""}')
-
-		# Add the information to the table
-		echo "<tr><td>$port</td><td>$service</td><td>$reason</td><td>$version</td></tr>" >> "$output_file"
-	    fi
+	for scan_file in "${nmap}"*.txt; do
+	    host_info=$(grep -m 1 "Nmap scan report for" "$scan_file")
+	    host_name=$(echo "$host_info" | awk '{print $5}')
+	    ip_address=$(echo "$host_info" | awk '{print $6}')
+	
+	    echo "<h2>$host_name $ip_address</h2>" >> "$output_file"
+	
+	    echo "<table>
+	        <tr>
+	            <th>Port</th>
+	            <th>Service</th>
+	            <th>Version</th>
+	        </tr>" >> "$output_file"
+	
+	    # Extract Ports, Services and Versions
+	    grep -E "^[0-9]+/tcp" "$scan_file" | while read -r line; do
+	        port=$(echo "$line" | awk '{print $1}')
+	        service=$(echo "$line" | awk '{print $3}')
+	        version=$(echo "$line" | awk '{for(i=4;i<=NF;i++) printf $i " "; print ""}' | xargs)
+	
+	        echo "        <tr>
+	            <td>$port</td>
+	            <td>$service</td>
+	            <td>$version</td>
+	        </tr>" >> "$output_file"
+	    done
+	
+	    echo "    </table>" >> "$output_file"
 	done
 
-	# Close the last subdomain's table
-	if [[ -n "$previous_url" ]]; then
-	    echo "</table>" >> "$output_file"
-	fi
-
-	# Close the HTML structure
-	echo "</body>" >> "$output_file"
-	echo "</html>" >> "$output_file"
-
-	echo "HTML output has been saved to $output_file."
+ 	echo "</body>
+	</html>" >> "$output_file"
+	echo -e "${GREEN}[+]${NC} HTML output has been saved to ${output_file}."
 }
 
 # Function for quick machine scan
