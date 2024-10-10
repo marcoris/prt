@@ -1,4 +1,4 @@
-# ptr.sh - v 1.0.0
+# ptr.sh - v 1.2.0
 ## PenTestRecon
 ```
 a. Run all
