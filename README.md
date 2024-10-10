@@ -26,4 +26,5 @@ x. Exit
 ./ptr.sh <url>
 ```
 ## nmap scan results
-![nmapscan](https://github.com/user-attachments/assets/900a200e-6ae5-4560-9805-10b1032b61ec)
+![image](https://github.com/user-attachments/assets/46a31c23-8a03-4460-9828-a8539bef7938)
+
