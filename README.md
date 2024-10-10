@@ -28,3 +28,7 @@ x. Exit
 ## nmap scan results
 ![image](https://github.com/user-attachments/assets/46a31c23-8a03-4460-9828-a8539bef7938)
 
+## Workflow
+The amass part has to be skipped because of the issue (crashing machine).
+![PentesterReconTool](https://github.com/user-attachments/assets/87fcd76c-2ec1-4428-89f6-ca5a84b0f088)
+
