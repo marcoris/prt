@@ -324,13 +324,13 @@ take_screenshots() {
     
     remove_screenshots
     
-    total_life_domains=$(ls -1 "$target_live_domains" | wc -l)
+    total_life_domains=$(wc -l < "$target_live_domains")
     
     echo -e "${BLUE}[i]${NC} Passive scan..."
     echo -e "${FUCHSIA}[*]${NC} Taking screenshots of ${total_life_domains} live domains with gowitness..."
     gowitness scan file -f "$target_live_domains" -s "$screenshots"
     
-    total_redirect_domains=$(ls -1 "$target_redirect_domains" | wc -l)
+    total_redirect_domains=$(wc -l < "$target_redirect_domains")
     
     echo -e "${BLUE}[i]${NC} Passive scan..."
     echo -e "${FUCHSIA}[*]${NC} Taking screenshots of ${total_redirect_domains} redirect domains with gowitness..."
@@ -366,13 +366,16 @@ get_open_ports() {
 # Function to generate html output from open ports
 generate_html_open_ports() {
 	# HTML document header
-	echo "<html>" > "$output_file"
-	echo "<head><title>Nmap Scan Results for ${target}</title></head>" >> "$output_file"
+	echo "<!DOCTYPE html><html>" > "$output_file"
+	echo "<head><title>Nmap Scan Results for ${target}</title><link href='../../../ptr/style.css' rel='stylesheet'></head>" >> "$output_file"
 	echo "<body>" >> "$output_file"
 	echo "<h1>Nmap Scan Results for ${target}</h1>" >> "$output_file"
+	
+	count=0
 
 	# Loop through all Nmap scan files in the directory
 	for file_path in "$output_dir"/*.txt; do
+	    count=$((count + 1))
 	    # Extract subdomain and IP address
 	    subdomain=$(grep -m 1 "Nmap scan report for" "$file_path" | awk '{print $5}')
 	    ip_address=$(grep -m 1 "Nmap scan report for" "$file_path" | awk -F '[()]' '{print $2}')
@@ -383,7 +386,7 @@ generate_html_open_ports() {
 	    # Only generate title and table if open ports are found
 	    if [[ -n "$open_ports" ]]; then
 		# Start the table for this scan
-		echo "<h2>$subdomain ($ip_address)</h2>" >> "$output_file"
+		echo "<h2>$count) $subdomain ($ip_address)</h2>" >> "$output_file"
 		echo "<table border='1'>" >> "$output_file"
 		echo "<tr><th>Port</th><th>State</th><th>Service</th><th>Reason</th><th>Version</th></tr>" >> "$output_file"
 
@@ -398,7 +401,7 @@ generate_html_open_ports() {
 	# HTML document end
 	echo "</body>" >> "$output_file"
 	echo "</html>" >> "$output_file"
-	echo -e "${GREEN}[+]${NC} Nmap output generated under $output_file."
+	echo -e "${GREEN}[+]${NC} Nmap output with $count subdomains generated under $output_file."
 }
 
 # Function to get CSP
