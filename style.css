@@ -1,3 +1,12 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 20px;
+  font-family: Roboto;
+}
+
 table {
 	border-collapse: collapse;
 	width: 500px;
@@ -10,4 +19,26 @@ th {
 
 tr:nth-child(odd) {
 	background-color: #ddd;
+}
+
+a img {
+  width: 300px;
+  border: 1px solid black;
+  height: auto;
+}
+
+.flex {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.flex a {
+  display: inline-block;
+  margin: 10px;
+}
+
+.flex::after {
+  content: "";
+  flex: auto;
 }
