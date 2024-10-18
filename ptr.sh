@@ -4,7 +4,7 @@
 VERSION="1.3.0"
 PORT="8080"
 proxy_url="http://127.0.0.1:${PORT}"
-HEADER="X-Bugbounty-Switzerland: SirOcram"
+HEADER="X-Bugbounty-Switzerland: USERNAME"
 DALFOXHEADER="--header \"$HEADER\""
 get_last_years=3
 allowed_types=(
