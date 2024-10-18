@@ -25,7 +25,21 @@ allowed_types=(
     "audio/wav"
     "video/mp4"
 )
-
+tools=(
+    assetfinder
+    amass
+    csp
+    dalfox
+    grepcidr
+    gowitness
+    httprobe
+    jq
+    nmap
+    sublist3r
+    subfinder
+    theHarvester
+    waybackurls
+)
 
 # Define colors
 GREEN="\033[1;32m"
@@ -41,20 +55,17 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
-# Check if the tools are installed
-check_tools() {
-	# Check if all required commands are installed
-	for cmd in assetfinder amass grepcidr gowitness httprobe jq nmap sublist3r subfinder theHarvester waybackurls; do
-	    if ! command -v $cmd &> /dev/null; then
-		echo -e "${RED}[!]${NC} $cmd is not installed. Please install it first."
-		exit 1
-	    fi
-	done
-}
+# Check if all required commands are installed
+for cmd in $tools; do
+    if ! command -v $cmd &> /dev/null; then
+    echo -e "${RED}[!]${NC} $cmd is not installed. Please install it first."
+    exit 1
+    fi
+done
 
 # Domain/file arguments
 target="$1"
-target_domains="../domains/${target}/"
+target_domains="../${target}/domains/"
 target_sub_domains="${target_domains}sub_domains.txt"
 amass_sub_domains="${target_domains}amass_sub_domains.txt"
 target_live_domains="${target_domains}live_domains.txt"
@@ -65,50 +76,50 @@ out_of_scope_results="${target_domains}out_of_scope_subdomains.txt"
 no_data_results="${target_domains}no_data_subdomains.txt"
 
 # Directory/file arguments
-the_harvester_files="../theharvester/$target/"
-download_dir="../downloads/$target/"
+the_harvester_files="../$target/theharvester/"
 target_theharvester="${the_harvester_files}theHarvester.json"
-waybackurls_files="../waybackurls/$target/"
-screenshots="../screenshots/$target/"
-xss_files="../security/$targer/xss/vulnerabilities.txt"
-csp_files="../security/$target/csp/"
-csp_has_file="${csp_files}has"
-csp_no_file="${csp_files}no"
-nmap="../nmap/$target"
-output_dir="$nmap/ports"
-output_html_open_ports="$output_dir/open_ports.html"
-output_html_screenshots="$output_dir/screenshots.html"
+download_files="../$target/downloads/"
+waybackurls_files="../$target/waybackurls/"
+screenshots="../$target/screenshots/"
+security="../$target/security/"
+xss_files="${security}xss/vulnerabilities.txt"
+csp_files="${security}csp/"
+csp_has_file="${csp_files}has/"
+csp_has_json="${csp_files}has/validation.json"
+csp_no_file="${csp_files}no/"
+nmap="../$target/nmap/"
+nmap_ports="${nmap}ports/"
+nmap_hosts="${nmap}hosts/"
+output_html_open_ports="${nmap_ports}open_ports.html"
+output_html_screenshots="${screenshots}screenshots.html"
+output_html_csp="${csp_has_file}validation.html"
 
-# Settings (Scope files)
-in_scope="../files/$target/in_scope.txt"
-out_of_scope="../files/$target/out_of_scope.txt"
+# Scope files
+in_scope="../$target/in_scope.txt"
+out_of_scope="../$target/out_of_scope.txt"
 
 # Make directories
 mkdir -p $target_domains
 mkdir -p $the_harvester_files
-mkdir -p $download_dir
+mkdir -p $download_files
 mkdir -p $waybackurls_files
 mkdir -p $screenshots
-mkdir -p "${nmap}ports/"
-mkdir -p "${nmap}hosts/"
-mkdir -p "$csp_has_file/"
-mkdir -p "$csp_no_file/"
+mkdir -p $nmap_ports
+mkdir -p $nmap_hosts
+mkdir -p $csp_has_file
+mkdir -p $csp_no_file
 
-# Display banner
 display_banner() {
-    echo -e "${FUCHSIA}"
-    echo "============================================"
+    echo -e "${FUCHSIA}============================================"
     echo ""
-    echo "             Pentest Recon Tool"
+    echo "             Pentester Recon Tool"
     echo "            Version $VERSION"
     echo "      Created by SirOcram aka 0xFF00FF"
     echo -e "       For domain: ${YELLOW}$target${NC}"
-    echo -e "${FUCHSIA}"
-    echo "============================================"
-    echo -e "${NC}"
+    echo ""
+    echo -e "${FUCHSIA}============================================${NC}"
 }
 
-# Get subdomains with assetfinder, subfinder and sublist3r
 get_subdomains() {    
     > $target_sub_domains
     
@@ -134,7 +145,6 @@ get_subdomains() {
     echo -e "${GREEN}[+]${NC} $total_domains subdomains saved to $target_sub_domains"
 }
 
-# Get subdomains with amass
 get_amass_subdirectories() {   
     echo -e "${BLUE}[i]${NC} Passive scan..."
     echo -e "${FUCHSIA}[*]${NC} Gathering subdomains with amass for ${YELLOW}$target${NC}..."
@@ -142,7 +152,7 @@ get_amass_subdirectories() {
     
     # Cleaning up ANSI codes
     text=$(cat "${target_domains}amass.txt")
-    clean_txt=$(remove_ansi_codes "$text")
+    clean_txt=$(cleanup_ansi_codes "$text")
     echo "$clean_txt" > "${target_domains}amass.txt"
     echo -e "${GREEN}[+]${NC} Clean text saved to ${target_domains}amass.txt"
     
@@ -165,14 +175,13 @@ get_amass_subdirectories() {
     echo -e "${GREEN}[+]${NC} $total_domains Subdomains gathered and sorted in ${target_sub_domains}."
 }
 
-# Cleanup ANSI codes
-remove_ansi_codes() {
+cleanup_ansi_codes() {
     local input_text="$1"
     echo "$input_text" | awk '{gsub(/\x1b\[[0-9;]*[a-zA-Z]/, "")}1'
 }
 
-# Get theHarvester data
 get_theharvester_data() {
+    echo -e "${BLUE}[i]${NC} Passive scan..."
 	limit=500
 	echo -e "${FUCHSIA}[*]${NC} Fetching subdomains with theHarvester..."
     start=$(date +%s)
@@ -220,7 +229,6 @@ get_theharvester_data() {
 
 }
 
-# Handle theHarvester data
 handle_theharvester_data() {
     mv theharvester.json $target_theharvester
     rm theharvester.xml
@@ -235,12 +243,12 @@ handle_theharvester_data() {
 
 	cat "${the_harvester_files}sub_domains.txt" >> $target_sub_domains
 
+    sort -u $target_sub_domains -o $target_sub_domains
+
     cat "${the_harvester_files}interesting_urls.txt" >> $target_redirect_domains
 	
-	sort -u $target_sub_domains -o $target_sub_domains
-
     total_domains_after=$(wc -l < $target_sub_domains)
-    echo -e "${GREEN}[+]${NC} $total_domains_before Subdomains before and $total_domains_after Subdomains after are saved in $target_sub_domains"
+    echo -e "${GREEN}[+]${NC} $total_domains_before Subdomains before and $total_domains_after subdomains after are saved in $target_sub_domains"
     
     total_redirect_domains=$(wc -l < $target_redirect_domains)
     echo -e "${GREEN}[+]${NC} $total_redirect_domains_before Redirected domains before and $total_redirect_domains Interesting domains after are saved in $target_redirect_domains"
@@ -249,8 +257,9 @@ handle_theharvester_data() {
     echo -e "${GREEN}[+]${NC} $total_emails E-mails are saved in ${the_harvester_files}emails.txt"
 }
 
-# Get wayback urls
 get_wayback_urls() {
+    echo -e "${BLUE}[i]${NC} Passive scan..."
+    > "${waybackurls_files}waybackurls_last_${get_last_years}_years.txt"
     start=$(date +%s)
 	echo -e "${FUCHSIA}[*]${NC} Subdomains to fetch with WaybackURLs. This can take a while..."
 	echo $target | waybackurls -dates | sort -u > "${waybackurls_files}waybackurls_raw.txt"
@@ -275,7 +284,7 @@ get_wayback_urls() {
     # remove the dates and save to waybackurls.txt
     cat "${waybackurls_files}waybackurls_last_${get_last_years}_years.txt" | awk '{print $2}' | sort -u > "${waybackurls_files}waybackurls.txt"
 
-    # check for keywords and save them in waybackurls_KEYWORD.txt (user, passw, admin, ...)
+    # check for keywords and save them in waybackurls/KEYWORD.txt (user, passw, admin, ...)
     keywords=(
         "api"
         "user"
@@ -283,13 +292,32 @@ get_wayback_urls() {
     )
 
     for keyword in "${keywords[@]}"; do
-        output_file="${keyword}.txt"
-        grep -i "$keyword" "${waybackurls_files}waybackurls.txt" > "${waybackurls_files}${output_file}"
+        output_file="${waybackurls_files}${keyword}.txt"
+        grep -i "$keyword" "${waybackurls_files}waybackurls.txt" > "${output_file}"
         total_domains=$(wc -l < "${output_file}")
         echo -e "${FUCHSIA}[*]${NC} $total_domains domains with keyword $keyword saved in $output_file"
     done
 
+    total_domains_before=$(wc -l < $target_sub_domains)
+
     # export the subdomins
+    while IFS= read -r url; do
+        if [[ "$url" =~ ^https?://([^/]+) ]]; then
+            domain="${BASH_REMATCH[1]}"
+            IFS='.' read -ra parts <<< "$domain"
+            main_domain="${parts[-2]}.${parts[-1]}"
+            echo "$main_domain" >> "$target_sub_domains"
+
+            if [ ${#parts[@]} -gt 2 ]; then
+                echo "$domain" >> "$target_sub_domains"
+            fi
+        fi
+    done < "${waybackurls_files}waybackurls.txt"
+
+    sort -u "$target_sub_domains" -o "$target_sub_domains"
+
+    total_domains_after=$(wc -l < $target_sub_domains)
+    echo -e "${GREEN}[+]${NC} $total_domains_before Subdomains before and $total_domains_after subdomains after are saved in $target_sub_domains"
 }
 
 check_for_downloads() {
@@ -300,34 +328,10 @@ check_for_downloads() {
         if is_downloadable "$url"; then
             filename=$(basename "$url")
             echo -e "${FUCHSIA}[*]${NC} Downloading file: $filename ($url)"
-            curl -o "$download_dir/$filename" "$url" -H $HEADER
+            curl -o "$download_files/$filename" "$url" -H $HEADER
         fi
         sleep 1
     done < "${waybackurls_files}waybackurls_last_${get_last_years}_years.txt"
-}
-
-# Funktion, um Datum aus der Zeile zu extrahieren
-get_date_from_line() {
-    echo "$1" | cut -d' ' -f1
-}
-
-# Funktion zur Binärsuche
-binary_search() {
-    local x_years_ago="$1"
-    local low=0
-    local high=$((${#lines[@]} - 1))
-    local mid
-    while [[ $low -le $high ]]; do
-        mid=$(( (low + high) / 2 ))
-        line_date=$(get_date_from_line "${lines[$mid]}")
-        
-        if [[ "$line_date" < "$x_years_ago" ]]; then
-            low=$((mid + 1))
-        else
-            high=$((mid - 1))
-        fi
-    done
-    echo $low
 }
 
 is_downloadable() {
@@ -346,50 +350,64 @@ is_downloadable() {
     return 1
 }
 
-# Function: Check if subdomains are in scope
+# Function to get the date from 1998-12-01T06:00:43Z URL
+get_date_from_line() {
+    echo "$1" | cut -d' ' -f1
+}
+
+binary_search() {
+    local x_years_ago="$1"
+    local low=0
+    local high=$((${#lines[@]} - 1))
+    local mid
+    while [[ $low -le $high ]]; do
+        mid=$(( (low + high) / 2 ))
+        line_date=$(get_date_from_line "${lines[$mid]}")
+        
+        if [[ "$line_date" < "$x_years_ago" ]]; then
+            low=$((mid + 1))
+        else
+            high=$((mid - 1))
+        fi
+    done
+    echo $low
+}
+
 check_scopes() {   
     total_sub_domains=$(wc -l < "$target_redirect_for_scope_domains")
     
     echo -e "${FUCHSIA}[*]${NC} Checking $total_sub_domains subdomains for scope..."
 
-    	# Dateien zurücksetzen, um sicherzustellen, dass sie leer sind
 	> "$in_scope_results"
 	> "$out_of_scope_results"
 	> "$no_data_results"
 
-	# Prüfen, ob die Scope-Dateien existieren
 	if [[ ! -f "$in_scope" || ! -f "$out_of_scope" || ! -f "$target_redirect_for_scope_domains" ]]; then
-	  echo "Eine oder mehrere Dateien fehlen!"
-	  exit 1
+        echo -e "${RED}[!]${NC} At least one file is missing!"
+        exit 1
 	fi
 
-	# Jede Subdomain durchgehen
 	while IFS= read -r subdomain; do
-	  # IP der Subdomain mit dig abrufen
-	  ip=$(dig +short "$subdomain")
-	  
-	  # Wenn keine IP gefunden wurde, Subdomain zu no_data_results.txt hinzufügen
-	  if [[ -z "$ip" ]]; then
-	    echo "$subdomain" >> "$no_data_results"
-	    continue
-	  fi
+        ip=$(dig +short "$subdomain")
+        
+        if [[ -z "$ip" ]]; then
+            echo "$subdomain" >> "$no_data_results"
+            continue
+        fi
 
-	  # Prüfen, ob in_scope.txt leer ist
-	  if [[ -s "$in_scope" ]]; then
-	    # Prüfung gegen in_scope.txt
-	    if echo "$ip" | grepcidr -f "$in_scope" > /dev/null; then
-	      echo "$subdomain" >> "$in_scope_results"
-	    else
-	      echo "$subdomain" >> "$out_of_scope_results"
-	    fi
-	  else
-	    # Wenn in_scope.txt leer ist, gegen out_of_scope.txt prüfen
-	    if echo "$ip" | grepcidr -f "$out_of_scope" > /dev/null; then
-	      echo "$subdomain" >> "$out_of_scope_results"
-	    else
-	      echo "$subdomain" >> "$in_scope_results"
-	    fi
-	  fi
+        if [[ -s "$in_scope" ]]; then
+            if echo "$ip" | grepcidr -f "$in_scope" > /dev/null; then
+                echo "$subdomain" >> "$in_scope_results"
+            else
+                echo "$subdomain" >> "$out_of_scope_results"
+            fi
+        else
+            if echo "$ip" | grepcidr -f "$out_of_scope" > /dev/null; then
+                echo "$subdomain" >> "$out_of_scope_results"
+            else
+                echo "$subdomain" >> "$in_scope_results"
+            fi
+        fi
 	done < "$target_redirect_for_scope_domains"
     
     total_in_scope_domains=$(wc -l < "$in_scope_results")
@@ -401,31 +419,28 @@ check_scopes() {
     echo -e "${GREEN}[+]${NC} ${total_no_data_domains} Subdomains are not callable."
 }
 
-# Function to check xss
 check_xss() {
-	echo -e "${FUCHSIA}[*]${NC} Scanning for XSS vulnerabilities..."
+	echo -e "${RED}[!]${NC} Active scanning for XSS vulnerabilities..."
     
     if [ -z "$HEADER" ]; then
-        cat "${target_domains}waybackurls.txt" | dalfox pipe --silence --output $xss_files
+        cat "${target_live_domains}" | dalfox pipe --silence --waf-evasion --output $xss_files
     else
-        cat "${target_domains}waybackurls.txt" | dalfox pipe --silence $HEADER --output $xss_files
+        cat "${target_live_domains}" | dalfox pipe --silence --waf-evasion $HEADER --output $xss_files
     fi
 }
 
-# Check for live domains with httprobe
 check_live_domains() {
     total_domains=$(wc -l < "$in_scope_results")
     count=0
 
     echo -e "${BLUE}[i]${NC} Active scan..."
-    echo -e "${FUCHSIA}[*]${NC} Checking $total_domains reachable subdomains with httprobe..."
+    echo -e "${FUCHSIA}[*]${NC} Checking $total_domains reachable and in scope subdomains with httprobe..."
     
-    > $target_live_domains # Clear live domains file
+    > $target_live_domains
     
     if [[ $total_domains -gt 0 ]]; then
-    	# Loop through each subdomain in the combined scope
         while read -r subdomain; do
-            count=$((count + 1))
+            ((count++))
             percentage=$((100 * count / total_domains))
             printf "\r                                                                                                  "
             printf "\r${FUCHSIA}[*]${NC} Testing domain $count/$total_domains: $subdomain - Percentage: [${GREEN}%d%%${NC}]" "$percentage"
@@ -439,37 +454,36 @@ check_live_domains() {
     echo -e "${GREEN}[+]${NC} $total_live_domains live subdomains saved to $target_live_domains"
 }
 
-# Function: Handle Redirects
 handle_redirects() {
     echo -e "${BLUE}[i]${NC} Active scan..."
     echo -e "${GREEN}[+]${NC} Handle redirects with curl and save subdomains to $target_redirect_domains"
     total_domains=$(wc -l < "$target_sub_domains")
     count=0
     
-    > "$target_redirect_domains" > "$target_redirect_for_scope_domains"
+    > "$target_redirect_domains"
+    > "$target_redirect_for_scope_domains"
     
     if [[ $total_domains -gt 0 ]]; then
 	    while read -r url; do
-		count=$((count + 1))
-		
-		# Use curl to follow redirects and get the final URL
-		final_url=$(curl --connect-timeout 10 -s -o /dev/null -w "%{url_effective}" -k -L "$url" -H "$HEADER")
-		# Remove the :443 port if it exists
-	    	final_url=$(echo "$final_url" | sed 's/:443//')
-	    	# Remove trailing slash if it exists
-	    	final_url=$(echo "$final_url" | sed 's/\/\+$//')
-		
-		printf "\r                                                                                                  "
-		printf "\r${FUCHSIA}[*]${NC} Testing domain $count/$total_domains: $url"
+            ((count++))
+            
+            # Use curl to follow redirects and get the final URL
+            final_url=$(curl --connect-timeout 10 -s -o /dev/null -w "%{url_effective}" -k -L "$url" -H "$HEADER")
+            # Remove the :443 port if it exists
+            final_url=$(echo "$final_url" | sed 's/:443//')
+            # Remove trailing slash if it exists
+            final_url=$(echo "$final_url" | sed 's/\/\+$//')
+            
+            printf "\r${FUCHSIA}[*]${NC} Testing domain $count/$total_domains: $url"
 
-		# Check if there is a new URL after the redirect
-		if [ "$final_url" != "$url" ]; then            
-		    # Save the final URL with its original protocol to the live domains file
-		    echo "$final_url" >> "$target_redirect_domains"
-		else
-		    # If no redirect, save the original URL
-		    echo "$url" >> "$target_redirect_domains"
-		fi
+            # Check if there is a new URL after the redirect
+            if [ "$final_url" != "$url" ]; then            
+                # Save the final URL with its original protocol to the live domains file
+                echo "$final_url" >> "$target_redirect_domains"
+            else
+                # If no redirect, save the original URL
+                echo "$url" >> "$target_redirect_domains"
+            fi
 	    done < "$target_sub_domains"
     fi
     
@@ -478,16 +492,18 @@ handle_redirects() {
     awk -F[/:] '{print $4}' "$target_redirect_domains" | sort -u >> "$target_redirect_for_scope_domains"
     
     total_redirect_domains=$(wc -l < "$target_redirect_domains")
-    printf "\r\n"
-    echo -e "${GREEN}[+]${NC} $total_redirect_domains live subdomains saved to $target_redirect_domains"
+    echo -e "${GREEN}[+]${NC} $total_redirect_domains redirected subdomains saved to $target_redirect_domains"
+
+    total_redirect_domains_for_scope=$(wc -l < "$target_redirect_for_scope_domains")
+    echo -e "${GREEN}[+]${NC} $total_redirect_domains_for_scope redirected subdomains saved to to check in scope in $target_redirect_for_scope_domains"
 }
 
-# Function: Import in Burp
 import_in_burp() {
     if ! curl -s --head --request GET "$proxy_url" | grep "200 OK" > /dev/null; then
         echo -e "${RED}[!]${NC} Warning: Burp Suite proxy at $proxy_url is not reachable."
         return 1
     fi
+
     echo -e "${BLUE}[i]${NC} Active scan..."
     echo -e "${FUCHSIA}[*]${NC} Sending reachable domains to Burp Suite Proxy using curl..."
 
@@ -495,25 +511,24 @@ import_in_burp() {
     count=0
 
     for live_domain in $(cat "$target_live_domains"); do
-        count=$((count + 1))
+        ((count++))
         echo -e "${YELLOW}[+]${NC} Sending domain $count/$total_live_domains: $live_domain"
-        curl -s -x "$proxy_url" -k "$live_domain" > /dev/null
+        curl -s -x "$proxy_url" -k "$live_domain" -H "$HEADER" > /dev/null
     done
 
     echo -e "${GREEN}[+]${NC} $count domains were successfully sent to the proxy."
 }
 
-# Function: Take screenshots
 take_screenshots() {    
     total_life_domains=$(wc -l < "$target_live_domains")
     
-    echo -e "${BLUE}[i]${NC} Passive scan..."
+    echo -e "${BLUE}[i]${NC} Active scan..."
     echo -e "${FUCHSIA}[*]${NC} Taking screenshots of ${total_life_domains} live domains with gowitness..."
     gowitness scan file -f "$target_live_domains" -s "$screenshots"
     
     total_redirect_domains=$(wc -l < "$target_redirect_domains")
     
-    echo -e "${BLUE}[i]${NC} Passive scan..."
+    echo -e "${BLUE}[i]${NC} Active scan..."
     echo -e "${FUCHSIA}[*]${NC} Taking screenshots of ${total_redirect_domains} redirect domains with gowitness..."
     gowitness scan file -f "$target_redirect_domains" -s "$screenshots"
     
@@ -521,87 +536,53 @@ take_screenshots() {
     echo -e "${BLUE}[i]${NC} $total_files screenshots were made."
 }
 
-# Function to generate HTML output of screenshot gallery
 generate_html_screenshots() {
-	# HTML document header
 	echo "<!DOCTYPE html><html>" > "$output_html_screenshots"
-	echo "<head><title>Nmap Scan Results for ${target}</title><link href='../../../ptr/style.css' rel='stylesheet'></head>" >> "$output_html_open_ports"
+	echo "<head><title>Screenshots from $target</title>" >> "$output_html_screenshots"
+    echo "<link rel='stylesheet' href='../../ptr/style.css'></head>" >> "$output_html_screenshots"
 	echo "<body>" >> "$output_html_screenshots"
-	echo "<h1>Nmap Scan Results for ${target}</h1>" >> "$output_html_screenshots"
+	echo "<h1>Screenshots from $target</h1><div class='flex'>" >> "$output_html_screenshots"
 	
 	count=0
 
 	# Loop through all Nmap scan files in the directory
-	for file_path in "$screenshots"/*.txt; do
-	    count=$((count + 1))
-	    # Extract subdomain and IP address
-	    subdomain=$(grep -m 1 "Nmap scan report for" "$file_path" | awk '{print $5}')
-	    ip_address=$(grep -m 1 "Nmap scan report for" "$file_path" | awk -F '[()]' '{print $2}')
-
-	    # Check if there are open ports
-	    open_ports=$(grep -E "^[0-9]+/tcp" "$file_path")
-
-	    # Only generate title and table if open ports are found
-	    if [[ -n "$open_ports" ]]; then
-		# Start the table for this scan
-		echo "<h2>$count) $subdomain ($ip_address)</h2>" >> "$output_html_screenshots"
-		echo "<div class='row'>"
-		echo "<div class='column'>"
-		echo "<img src='$screenshots' style='width:100%'>"
-		echo "</div></div>"
-		echo "<table border='1'>" >> "$output_html_screenshots"
-		echo "<tr><th>Port</th><th>State</th><th>Service</th><th>Reason</th><th>Version</th></tr>" >> "$output_html_screenshots"
-
-		# Add open ports to the table
-		echo "$open_ports" | awk '{print "<tr><td>"$1"</td><td>"$2"</td><td>"$3"</td><td>"$4" "$5" "$6"</td><td>"$7"</td></tr>"}' >> "$output_html_screenshots"
-
-		# End the table
-		echo "</table><br>" >> "$output_html_screenshots"
-	    fi
+	for img in "${screenshots}"*.jpeg; do
+	    if [[ -f "$img" ]]; then
+            ((count++))
+            echo "<a href='${img##*/}' data-lightbox='screenshot' data-title='${img##*/}' target='_blank'><img src='${img##*/}'></a>" >> "$output_html_screenshots"
+        fi
 	done
 
-	# HTML document end
-	echo "</body>" >> "$output_html_screenshots"
+	echo "</div></body>" >> "$output_html_screenshots"
 	echo "</html>" >> "$output_html_screenshots"
-	echo -e "${GREEN}[+]${NC} Nmap output with $count subdomains generated under $output_html_screenshots."
+	echo -e "${GREEN}[+]${NC} $count screenshots were saved in $output_html_screenshots"
 }
 
-# Function: Get open ports
 get_open_ports() {
-    if ! command -v nmap &> /dev/null; then
-        echo -e "${RED}[!]${NC} Error: nmap is not installed. Please install it first."
-        return 1
-    fi
-    echo -e "${RED}[i]${NC} Active scan..."
-    
-
+    echo -e "${RED}[!]${NC} Active scan..."
     total_domains=$(cat "${in_scope_results}" | wc -l)
     echo -e "${FUCHSIA}[*]${NC} Scanning ${total_domains} domains for open ports with nmap. This can take a while..."
     
      # Loop through each live domain in the input file
-    while read -r target; do
+    while read -r target_scope; do
         # Use a safe filename by replacing unwanted characters
-        safe_target=$(echo $target | tr -s '[:punct:]' '_' | tr ' ' '_')
+        safe_target=$(echo $target_scope | tr -s '[:punct:]' '_' | tr ' ' '_')
     
         # Run Nmap scan and save output to a file named after the domain
-        sudo nmap -sS -sV -O -oN "${nmap}ports/${safe_target}.txt" -vv -p- -T3 --script=default --min-rate=50 --max-retries=3 $target
+        sudo nmap -sS -sV -O -oN "${nmap_ports}${safe_target}.txt" -vv -p- -T3 --script=default --min-rate=50 --max-rate=75 --max-retries=3 $target_scope
     done < "${in_scope_results}"
 }
 
-
-# Function to generate html output from open ports
 generate_html_open_ports() {
-	# HTML document header
 	echo "<!DOCTYPE html><html>" > "$output_html_open_ports"
-	echo "<head><title>Nmap Scan Results for ${target}</title><link href='../../../ptr/style.css' rel='stylesheet'></head>" >> "$output_html_open_ports"
+	echo "<head><title>Nmap Scan Results from $target</title><link href='../../../ptr/style.css' rel='stylesheet'></head>" >> "$output_html_open_ports"
 	echo "<body>" >> "$output_html_open_ports"
-	echo "<h1>Nmap Scan Results for ${target}</h1>" >> "$output_html_open_ports"
+	echo "<h1>Nmap Scan Results for $target</h1>" >> "$output_html_open_ports"
 	
 	count=0
 
-	# Loop through all Nmap scan files in the directory
-	for file_path in "$output_dir"/*.txt; do
-	    count=$((count + 1))
+	for file_path in "$nmap_ports"*.txt; do
+	    ((count++))
 	    # Extract subdomain and IP address
 	    subdomain=$(grep -m 1 "Nmap scan report for" "$file_path" | awk '{print $5}')
 	    ip_address=$(grep -m 1 "Nmap scan report for" "$file_path" | awk -F '[()]' '{print $2}')
@@ -611,50 +592,42 @@ generate_html_open_ports() {
 
 	    # Only generate title and table if open ports are found
 	    if [[ -n "$open_ports" ]]; then
-		# Start the table for this scan
+
 		echo "<h2>$count) $subdomain ($ip_address)</h2>" >> "$output_html_open_ports"
 		echo "<table border='1'>" >> "$output_html_open_ports"
 		echo "<tr><th>Port</th><th>State</th><th>Service</th><th>Reason</th><th>Version</th></tr>" >> "$output_html_open_ports"
 
 		# Add open ports to the table
 		echo "$open_ports" | awk '{print "<tr><td>"$1"</td><td>"$2"</td><td>"$3"</td><td>"$4" "$5" "$6"</td><td>"$7"</td></tr>"}' >> "$output_html_open_ports"
-
-		# End the table
 		echo "</table><br>" >> "$output_html_open_ports"
 	    fi
 	done
 
-	# HTML document end
 	echo "</body>" >> "$output_html_open_ports"
 	echo "</html>" >> "$output_html_open_ports"
 	echo -e "${GREEN}[+]${NC} Nmap output with $count subdomains generated under $output_html_open_ports."
 }
 
-# Function to get CSP
 check_csp() {
     echo -e "${FUCHSIA}[*]${NC} Checking for CSP..."
-
-    # Calculate the total number of domains to check
     total_domains=$(wc -l < "$target_live_domains")
     count=0
 
-    # Loop through the sorted list of domains and check for CSP
-    while read -r target; do
-        ((count++))  # Increment the counter
+    while read -r target_live; do
+        ((count++))
 
-        # Display progress
-        echo -e "${FUCHSIA}[*]${NC} Checking domain $count of ${total_domains}: $target"
+        echo -e "${FUCHSIA}[*]${NC} Checking domain $count of ${total_domains}: $target_live"
 
         # Convert target to a safe filename format
-        safe_target=$(echo $target | tr -s '[:punct:]' '_' | tr ' ' '_')
+        safe_target=$(echo $target_live | tr -s '[:punct:]' '_' | tr ' ' '_')
 
         # Check for Content Security Policy (CSP) in the headers
-        has_csp=$(curl --connect-timeout 10 -s -D - $target -H "$HEADER" | grep -i "content-security-policy")
+        has_csp=$(curl --connect-timeout 10 -s -D - $target_live -H "$HEADER" | grep -i "content-security-policy")
         if [[ -n "$has_csp" ]]; then
             csp_content=$(echo "$has_csp" | sed 's/[Cc]ontent-[Ss]ecurity-[Pp]olicy: //I')
     	    echo "$csp_content" > "${csp_has_file}/${safe_target}.txt"
         else
-            echo $target > "${csp_no_file}/${safe_target}.txt"
+            echo $target_live > "${csp_no_file}/${safe_target}.txt"
         fi
     done < "${target_live_domains}"
 
@@ -667,170 +640,210 @@ check_csp() {
     echo -e "${GREEN}[+]${NC} $total_no_files domains have no CSP."
 }
 
-# Function to validate csp
 validate_csp() {
-	echo "passing..."
+	echo -e "${FUCHSIA}[*]${NC} Validating CSP..."
+    total_has=$(ls -1 "$csp_has_file" | wc -l)
+
+    > $csp_has_json
+
+    for has_csp in "$csp_has_file"*.txt; do
+        csp validate "${csp_has_file}${has_csp}" --output-format json &>> $csp_has_json
+    done
+
+    echo "<html><head><title>CSP Validation Report for $target</title></head><body>" > "$output_html_csp"
+    echo "<h1>CSP Validation Report for $target</h1>" >> "$output_html_csp"
+
+    # Read and process each JSON entry
+    jq -c '.[]' "$input_file" | while read -r item; do
+        directive=$(echo "$item" | jq -r '.directive')
+        description=$(echo "$item" | jq -r '.description')
+
+        # Extract the URL from the directive, if present
+        url=$(echo "$directive" | grep -oP '(https?://[^\s]+)' || echo "URL not found")
+
+        # Add the data to the HTML file with a structured layout
+        echo "<h2>URL: $url</h2>" >> "$output_file"
+        echo "<h3>CSP Validation of $directive</h3>" >> "$output_file"
+        echo "<p><b>Directive:</b> $directive</p>" >> "$output_file"
+        echo "<p><b>Description:</b> $description</p><hr>" >> "$output_file"
+    done
+
+    # Close the HTML tags
+    echo "</body></html>" >> "$output_html_csp"
+
+    echo "HTML report generated: $output_html_csp"
 }
 
-# Function for quick machine scan
 quick_host_up_check() {
-    # Get IP/range
+    # Get IP/range vom input
     echo -e "${FUCHSIA}[*]${NC} Quick scan for hosts with nmap."
     echo -e "${YELLOW}[*]${NC} Insert IP/range: "
     read iprange
     safe_target=$(echo "$iprange" | tr -s '[:punct:]' '_' | tr ' ' '_')
     
-    nmap -oN "${nmap}hosts/${safe_target}_hosts.txt" -sn "$iprange"
+    nmap -oN "${nmap_hosts}/${safe_target}_hosts.txt" -sn "$iprange"
 }
 
-# Function to clean up files
-remove_domains() {
-    echo -e "${RED}[!]${NC} Removing all domains from ${target_domains}."
-    rm -rf $target_domains
-    if [ ! -d $target_domains ]; then
-    	echo -e "${GREEN}[+]${NC} Domains are successfully removed."
-    	echo -e "${FUCHSIA}[*]${NC} making missing domains directory under: ${target_domains}."
-	mkdir -p $target_domains
+remove_directories() {
+    local directory=$1
+
+    if [ -z "$directory" ]; then
+        echo -e "${RED}[!]${NC} Error: No directory provided."
+        exit 1
+    fi
+
+    if [ -d $directory ]; then
+        echo -e "${RED}[!]${NC} Removing all files from ${directory}."
+        rm -rf $directory
+        if [ ! -d $directory ]; then
+            echo -e "${GREEN}[+]${NC} Files are successfully removed."
+            echo -e "${FUCHSIA}[*]${NC} making missing directory under: ${directory}."
+            mkdir -p $directory
+        fi 
     fi
 }
-
-# Function remove screenshots
-remove_screenshots() {
-    echo -e "${RED}[!]${NC} Removing all screenshots from ${screenshots}."
-    rm -rf $screenshots
-    if [ ! -d $screenshots ]; then
-    	echo -e "${GREEN}[+]${NC} Screenshots are successfully removed."
-    	echo -e "${FUCHSIA}[*]${NC} making missing screenshots directory under: ${screenshots}."
-	mkdir -p $screenshots
-    fi
-}
-
-# Function remove open ports
-remove_open_ports() {
-    echo -e "${RED}[!]${NC} Removing all open ports from ${nmap}."
-    rm -rf $nmap
-    if [ ! -d $nmap ]; then
-    	echo -e "${GREEN}[+]${NC} Open ports are successfully removed."
-    	echo -e "${FUCHSIA}[*]${NC} making missing nmap directory under: ${nmap}."
-	mkdir -p $nmap
-    fi
-}
-
-remove_csp() {
-   echo -e "${RED}[!]${NC} Removing all csp files ${csp_files}."
-    rm -rf $csp_files
-    if [ ! -d $csp_files ]; then
-    	echo -e "${GREEN}[+]${NC} CSP files are successfully removed."
-    	echo -e "${FUCHSIA}[*]${NC} making missing CSP directories under: ${csp_files}."
-	mkdir -p $csp_files
-	mkdir -p "$csp_has_file/"
-	mkdir -p "$csp_no_file/"
-    fi
-}
-
-# Check if all necessary tools are installed
-check_tools
 
 # Loop to show menu after each task
 while true; do
     display_banner
-    # Menu
-    echo "a. Run all"
-    echo "1. Get all subdomains (assetfinder, subfinder)"
-    echo "2. Get amass subdomains (skipping...)"
-    echo "h. Get theHarvester entries"
-    echo "w. WaybackURLs"
-    echo "3. Handle redirects"
-    echo "4. Check scopes"
-    echo "5. Check for live domains (httprobe)"
-    echo "6. Check CSP"
-    echo "7. Take screenshots (gowitness)"
-    echo "8. Import in Burp (burp/proxy)"
-    echo "9. Quick host up check (IP/range nmap)"
-    echo "10. Get open ports (nmap)"
-    echo "11. Generate HTML output of open ports"
-    echo "12. Cleanup all files (domains/screenshots/nmap/csp)"
-    echo "13. Cleanup domains"
-    echo "14. Cleanup screenshots"
-    echo "15. Cleanup nmap scans"
-    echo "16.Cleanup CSP files"
-    echo "x. Exit"
-    read -p "Select an option: " option
 
-    # Execute based on user selection
-    case $option in
-        a)
-            remove_domains
-            remove_screenshots
-            remove_open_ports
-            remove_csp
-            get_subdomains
-            get_amass_subdirectories
-            handle_redirects
-            check_scopes
-            check_live_domains
-            check_csp
-            take_screenshots
-            import_in_burp
-            get_open_ports
-            generate_html_open_ports
-            ;;
+    echo -e "${FUCHSIA}==== Main Menu ====${NC}"
+    echo "1. Subdomain Enumeration and Reconnaissance"
+    echo "2. Domain Check and Scope Handling"
+    echo "3. Security Tests"
+    echo "4. Reporting and Import"
+    echo "5. Cleanup"
+    echo "x. Exit"
+    read -p "Select a category: " main_option
+
+    case $main_option in
         1)
-            get_subdomains
+            while true; do
+                display_banner
+
+                echo -e "${FUCHSIA}==== Subdomain Enumeration and Reconnaissance ====${NC}"
+                echo "1. Get all subdomains (assetfinder, subfinder)"
+                echo "2. Get Amass subdomains"
+                echo "3. Get theHarvester entries"
+                echo "4. Fetch WaybackURLs"
+                echo "x. Back to Main Menu"
+                read -p "Select an option: " subdomain_option
+
+                case $subdomain_option in
+                    1) get_subdomains ;;
+                    2) get_amass_subdirectories ;;
+                    3) get_theharvester_data ;;
+                    4) get_wayback_urls ;;
+                    x) break ;;
+                    *) echo -e "${RED}[!]${NC} Invalid option." ;;
+                esac
+            done
             ;;
         2)
-            get_amass_subdirectories
-            ;;
-        h)
-            get_theharvester_data
-            ;;
-        w)
-            get_wayback_urls
+            while true; do
+                display_banner
+
+                echo -e "${FUCHSIA}==== Domain Check and Scope Handling ====${NC}"
+                echo "1. Handle redirects"
+                echo "2. Check scopes"
+                echo "3. Check for live domains (httprobe)"
+                echo "x. Back to Main Menu"
+                read -p "Select an option: " domain_option
+
+                case $domain_option in
+                    1) handle_redirects ;;
+                    2) check_scopes ;;
+                    3) check_live_domains ;;
+                    x) break ;;
+                    *) echo -e "${RED}[!]${NC} Invalid option." ;;
+                esac
+            done
             ;;
         3)
-            handle_redirects
+            while true; do
+                display_banner
+
+                echo -e "${FUCHSIA}==== Security Tests ====${NC}"
+                echo "1. Check CSP"
+                echo "2. Validate CSP"
+                echo "3. Check XSS with Dalfox"
+                echo "x. Back to Main Menu"
+                read -p "Select an option: " security_option
+
+                case $security_option in
+                    1) check_csp ;;
+                    2) validate_csp ;;
+                    3) check_xss ;;
+                    x) break ;;
+                    *) echo -e "${RED}[!]${NC} Invalid option." ;;
+                esac
+            done
             ;;
         4)
-            check_scopes
+            while true; do
+                display_banner
+
+                echo -e "${FUCHSIA}==== Reporting and Import ====${NC}"
+                echo "1. Take screenshots (gowitness)"
+                echo "2. Generate HTML output of screenshots"
+                echo "3. Import into Burp Suite"
+                echo "4. Quick host up check (IP/range nmap)"
+                echo "5. Get open ports (nmap)"
+                echo "6. Generate HTML output of open ports"
+                echo "7. Check for downloads"
+                echo "x. Back to Main Menu"
+                read -p "Select an option: " reporting_option
+
+                case $reporting_option in
+                    1) take_screenshots ;;
+                    2) generate_html_screenshots ;;
+                    3) import_in_burp ;;
+                    4) quick_host_up_check ;;
+                    5) get_open_ports ;;
+                    6) generate_html_open_ports ;;
+                    7) check_for_downloads ;;
+                    x) break ;;
+                    *) echo -e "${RED}[!]${NC} Invalid option." ;;
+                esac
+            done
             ;;
         5)
-            check_live_domains
-            ;;
-        6)
-            check_csp
-            ;;
-        7)
-            take_screenshots
-            ;;
-        8)
-            import_in_burp
-            ;;
-        9)
-            quick_host_up_check
-            ;;
-        10)
-            get_open_ports
-            ;;
-        11)
-            generate_html_open_ports
-            ;;
-        12)
-            remove_domains
-            remove_screenshots
-            remove_open_ports
-            remove_csp
-            ;;
-        13)
-            remove_domains
-            ;;
-        14)
-            remove_screenshots
-            ;;
-        15)
-            remove_open_ports
-            ;;
-        16)
-            remove_csp
+            while true; do
+                display_banner
+
+                echo -e "${FUCHSIA}==== Cleanup ====${NC}"
+                echo "1. Cleanup all files"
+                echo "2. Cleanup domains"
+                echo "3. Cleanup downloads"
+                echo "4. Cleanup nmap"
+                echo "5. Cleanup screenshots"
+                echo "6. Cleanup security"
+                echo "7. Cleanup theHarvester"
+                echo "8. Cleanup waybackURLs"
+                echo "x. Back to Main Menu"
+                read -p "Select an option: " cleanup_option
+
+                case $cleanup_option in
+                    1) 
+                        remove_directories $target_domains
+                        remove_directories $download_files
+                        remove_directories $nmap
+                        remove_directories $screenshots
+                        remove_directories $security
+                        remove_directories $the_harvester_files
+                        remove_directories $waybackurls_files
+                        ;;
+                    2) remove_directories $target_domains ;;
+                    3) remove_directories $download_files ;;
+                    4) remove_directories $nmap ;;
+                    5) remove_directories $screenshots ;;
+                    6) remove_directories $security ;;
+                    7) remove_directories $the_harvester_files ;;
+                    8) remove_directories $waybackurls_files ;;
+                    x) break ;;
+                    *) echo -e "${RED}[!]${NC} Invalid option." ;;
+                esac
+            done
             ;;
         x)
             echo "Exiting..."
@@ -840,6 +853,4 @@ while true; do
             echo -e "${RED}[!]${NC} Invalid option."
             ;;
     esac
-
-    sleep 2
 done
