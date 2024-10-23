@@ -1,3 +1,4 @@
 {
-	"user-agent":"X-<CUSTOMER>-BUGBOUNTY: <USERNAME> - <YOUR USER AGENT>"
+	"user-agent":"X-<CUSTOMER>-BUGBOUNTY: <USERNAME> - <YOUR USER AGENT>",
+	"timeout": 30
 }
