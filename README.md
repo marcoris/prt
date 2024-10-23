@@ -28,6 +28,9 @@ x. Exit
 ## nmap scan results
 ![image](https://github.com/user-attachments/assets/46a31c23-8a03-4460-9828-a8539bef7938)
 
+## CSP scan report
+![image](https://github.com/user-attachments/assets/d3e9643c-321e-42ff-a239-13f25f3cf0a1)
+
 ## Workflow
 ![image](https://github.com/user-attachments/assets/2cae0dbb-ca35-4e21-b9ad-5a5e4af4e4b0)
 
