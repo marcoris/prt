@@ -29,6 +29,6 @@ x. Exit
 ![image](https://github.com/user-attachments/assets/46a31c23-8a03-4460-9828-a8539bef7938)
 
 ## Workflow
-The amass part has to be skipped because of the issue (crashing machine).
-![PentesterReconTool](https://github.com/user-attachments/assets/87fcd76c-2ec1-4428-89f6-ca5a84b0f088)
+![image](https://github.com/user-attachments/assets/2cae0dbb-ca35-4e21-b9ad-5a5e4af4e4b0)
+
 
