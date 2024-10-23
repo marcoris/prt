@@ -81,8 +81,8 @@ nmap_ports="${nmap}ports/"
 nmap_hosts="${nmap}hosts/"
 output_html_open_ports="${nmap}report.html"
 output_html_screenshots="${screenshots}screenshots.html"
-output_html_csp="${csp_files}report.html"
-output_html_xss="${xss_files}report.html"
+output_html_csp="${security}csp-report.html"
+output_html_xss="${security}xss-report.html"
 
 # Scope files
 in_scope="../$target/in_scope.txt"
@@ -402,17 +402,19 @@ check_xss() {
         mkdir -p $xss_files
     fi
 
-	echo -e "${RED}[!]${NC} Active scanning with dalfox for XSS vulnerabilities with a delay of ${YELLOW}$DELAY ms${NC}..."
-    echo -e "${BLUE}[i]${NC} Using ${YELLOW}portswigger${NC} and ${YELLOW}payloadbox${NC} as remote payloads."
+    total_live_domains=$(wc -l < "$target_live_domains")
+
+	echo -e "${RED}[!]${NC} Active scanning for ${YELLOW}$total_live_domains live domains${NC} with ${YELLOW}dalfox${NC} for XSS vulnerabilities with a delay of ${YELLOW}$DELAY ms${NC}..."
+    echo -e "${BLUE}[i]${NC} Using ${YELLOW}portswigger$, payloadbox${NC} as remote payloads."
 
     > $xss_vulns
     
     start=$(date +%s)
 
     if [ -z "$HEADER" ]; then
-        cat "${target_live_domains}" | timeout ${DALFOX_TIMEOUT}m dalfox pipe --config dalfox.config.json --silence --delay "$DELAY" --output $xss_vulns --remote-payloads portswigger,payloadbox
+        cat "${target_live_domains}" | dalfox pipe --config dalfox.config.json --silence --delay "$DELAY" --output $xss_vulns --remote-payloads portswigger,payloadbox
     else
-        cat "${target_live_domains}" | timeout ${DALFOX_TIMEOUT}m dalfox pipe --config dalfox.config.json --silence --delay "$DELAY" --header $HEADER --output $xss_vulns --remote-payloads portswigger,payloadbox
+        cat "${target_live_domains}" | dalfox pipe --config dalfox.config.json --silence --delay "$DELAY" --header $HEADER --output $xss_vulns --remote-payloads portswigger,payloadbox
     fi
 
     end=$(date +%s)
