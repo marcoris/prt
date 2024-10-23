@@ -286,16 +286,6 @@ get_wayback_urls() {
     echo -e "${BLUE}[i]${NC} ${YELLOW}$total_domains_before${NC} Subdomains before and ${YELLOW}$total_domains_after${NC} subdomains after are saved in ${YELLOW}$target_sub_domains${NC}"
 }
 
-check_delay() {
-    if [[ "$DELAY" -lt 1000 && "$DELAY" -gt 1 ]]; then
-        NEWDELAY=1
-    else
-        NEWDELAY=$DELAY
-    fi
-
-    echo $NEWDELAY
-}
-
 check_for_downloads() {
     if [ ! -n "$get_last_years" ]; then
         echo -e "${RED}[!]${NC} You first have to run the waybackurls menu entry: ${YELLOW}1.3${NC}"
@@ -315,9 +305,7 @@ check_for_downloads() {
             curl -sS --connect-timeout 10 --header "$HEADER" --proxy-header "$HEADER" -o "${download_files}${filepath}/$filename" "$url"
         fi
 
-        NEWDELAY=$(check_delay)
-
-        sleep $NEWDELAY
+        sleep $(awk "BEGIN {printf \"%.2f\", $DELAY/1000}")
     done < "${waybackurls_files}waybackurls_last_${get_last_years}_years.txt"
 
     total_download_dirs=$(ls -1 "$download_files" | wc -l)
@@ -472,9 +460,7 @@ check_live_domains() {
             echo -e "${FUCHSIA}[*]${NC} Testing domain ${YELLOW}$count/$total_domains${NC}: ${YELLOW}$subdomain${NC}"
             echo "$subdomain" | httprobe >> "$target_live_domains"
 
-            NEWDELAY=$(check_delay)
-
-            sleep $NEWDELAY
+            sleep $(awk "BEGIN {printf \"%.2f\", $DELAY/1000}")
         done < "$in_scope_results"
     fi
     
@@ -515,9 +501,7 @@ handle_redirects() {
                 echo "$url" >> "$target_redirect_domains"
             fi
 
-            NEWDELAY=$(check_delay)
-
-            sleep $NEWDELAY
+            sleep $(awk "BEGIN {printf \"%.2f\", $DELAY/1000}")
 	    done < "$target_sub_domains"
     fi
     
@@ -549,9 +533,7 @@ import_in_burp() {
         echo -e "${YELLOW}[+]${NC} Sending domain $count/$total_live_domains: $live_domain"
         curl -s -x "$PROXY_URL" -k "$live_domain" > /dev/null
 
-        NEWDELAY=$(check_delay)
-
-        sleep $NEWDELAY
+        sleep $(awk "BEGIN {printf \"%.2f\", $DELAY/1000}")
     done
 
     echo -e "${GREEN}[+]${NC} ${YELLOW}$count${NC} domains were successfully sent to the proxy."
@@ -695,9 +677,7 @@ check_csp() {
             echo $target_live > "${csp_no_file}/${safe_target}.txt"
         fi
 
-        NEWDELAY=$(check_delay)
-
-        sleep $NEWDELAY
+        sleep $(awk "BEGIN {printf \"%.2f\", $DELAY/1000}")
     done < "${target_live_domains}"
     
     total_has_files=$(ls -1 "$csp_has_file" | wc -l)
