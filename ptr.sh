@@ -419,10 +419,6 @@ check_xss() {
 
     end=$(date +%s)
 
-    if [ $? -eq 124 ]; then
-        echo -e "${BLUE}[i]${NC} Dalfox exited due to a timeout from ${YELLOW}$DALFOX_TIMEOUT minutes${NC}"
-    fi
-
     echo -e "${BLUE}[i]${NC} Took ${YELLOW}$(($end-$start)) seconds${NC} to scan for XSS vulns which are saved in ${YELLOW}$xss_vulns${NC}"
 }
 
