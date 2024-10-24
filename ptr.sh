@@ -248,14 +248,16 @@ get_wayback_urls() {
     cat "${waybackurls_files}waybackurls_last_${get_last_years}_years.txt" | awk '{print $2}' | sort -u > "${waybackurls_files}waybackurls.txt"
 
     # check for keywords and save them in waybackurls/KEYWORD.txt (user, passw, admin, ...)
-    keywords=(
-        "adm"
-        "admin"
-        "api"
-        "passw"
-        "user"
-        "usr"
-    )
+    keywords=()
+
+    while true; do
+        read -p "Enter keyword to search (or press Enter to exit): " keyword
+        if [[ -z "$keyword" ]]; then
+            echo "No keyword entered. Exiting."
+            break
+        fi
+        keywords+=("$keyword")
+    done
 
     for keyword in "${keywords[@]}"; do
         output_file="${waybackurls_files}${keyword}.txt"
@@ -475,8 +477,9 @@ handle_redirects() {
     count=0
     
     > "$target_redirect_domains"
-    cat "${the_harvester_files}interesting_urls.txt" >> $target_redirect_domains
     > "$target_redirect_for_scope_domains"
+    
+    cat "${the_harvester_files}interesting_urls.txt" >> $target_redirect_domains
     
     if [[ $total_domains -gt 0 ]]; then
 	    while read -r url; do
