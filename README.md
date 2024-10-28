@@ -75,7 +75,7 @@ x. Back to Main Menu
 ![image](https://github.com/user-attachments/assets/8f010c1f-cfdf-447e-8d75-d5810da4ee79)
 
 ## nmap scan results
-![image](https://github.com/user-attachments/assets/46a31c23-8a03-4460-9828-a8539bef7938)
+![image](https://github.com/user-attachments/assets/02a1cc3a-cf03-4888-8820-b26bf42f8401)
 
 ## Workflow
 ![image](https://github.com/user-attachments/assets/2cae0dbb-ca35-4e21-b9ad-5a5e4af4e4b0)
