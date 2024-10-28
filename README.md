@@ -52,6 +52,18 @@ x. Back to Main Menu
 9. Check for downloads
 x. Back to Main Menu
 ```
+### Cleanup
+```
+===================== Cleanup ======================
+1. Cleanup all files
+2. Cleanup domains
+3. Cleanup downloads
+4. Cleanup nmap
+5. Cleanup screenshots
+6. Cleanup security
+7. Cleanup theHarvester
+8. Cleanup waybackURLs
+```
 
 ## CSP scan report
 ![image](https://github.com/user-attachments/assets/d3e9643c-321e-42ff-a239-13f25f3cf0a1)
