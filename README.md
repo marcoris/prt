@@ -69,7 +69,7 @@ x. Back to Main Menu
 ![image](https://github.com/user-attachments/assets/d3e9643c-321e-42ff-a239-13f25f3cf0a1)
 
 ## XSS scan report
-Coming Soon
+![image](https://github.com/user-attachments/assets/bd5d0d00-d5d5-451e-85ff-649c116cbd61)
 
 ## Screenshots
 ![image](https://github.com/user-attachments/assets/8f010c1f-cfdf-447e-8d75-d5810da4ee79)
