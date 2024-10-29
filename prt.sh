@@ -39,6 +39,11 @@ tools=(
     waybackurls
 )
 
+dalfox_payloads_list=(
+    portswigger
+    payloadbox
+)
+
 # Check if a domain argument was passed
 if [ -z "$1" ]; then
     echo -e "${RED}[!]${NC} Error: No domain provided. Example usage: $0 example.com"
@@ -55,7 +60,7 @@ done
 
 # Domain/file arguments
 target="$1"
-target_domains="../${target}/domains/"
+target_domains="../${WEBAPP_DIR}/${target}/domains/"
 target_sub_domains="${target_domains}sub_domains.txt"
 target_live_domains="${target_domains}live_domains.txt"
 target_redirect_domains="${target_domains}redirect_domains.txt"
@@ -65,28 +70,31 @@ out_of_scope_results="${target_domains}out_of_scope_subdomains.txt"
 no_data_results="${target_domains}no_data_subdomains.txt"
 
 # Directory/file arguments
-the_harvester_files="../$target/theharvester/"
+the_harvester_files="../${WEBAPP_DIR}/$target/theharvester/"
 target_theharvester="${the_harvester_files}theHarvester.json"
-download_files="../$target/downloads/"
-waybackurls_files="../$target/waybackurls/"
-screenshots="../$target/screenshots/"
-security="../$target/security/"
+download_files="../${WEBAPP_DIR}/$target/downloads/"
+waybackurls_files="../${WEBAPP_DIR}/$target/waybackurls/"
+screenshots="../${WEBAPP_DIR}/$target/screenshots/"
+security="../${WEBAPP_DIR}/$target/security/"
 xss_files="${security}xss/"
 csp_files="${security}csp/"
 xss_vulns="${xss_files}vulnerabilities.txt"
 csp_has_file="${csp_files}has/"
 csp_no_file="${csp_files}no/"
-nmap="../$target/nmap/"
+nmap="../${WEBAPP_DIR}/$target/nmap/"
 nmap_ports="${nmap}ports/"
 nmap_hosts="${nmap}hosts/"
-output_html_open_ports="${nmap}report.html"
+output_html_open_ports="${nmap}open-ports-report.html"
+output_html_hosts_up="${nmap}hosts-up-report.html"
 output_html_screenshots="${screenshots}screenshots.html"
 output_html_csp="${security}csp-report.html"
 output_html_xss="${security}xss-report.html"
 
+CSS="<link rel='stylesheet' href='../../../prt/style.css'>"
+
 # Scope files
-in_scope="../$target/in_scope.txt"
-out_of_scope="../$target/out_of_scope.txt"
+in_scope="../${WEBAPP_DIR}/$target/in_scope.txt"
+out_of_scope="../${WEBAPP_DIR}/$target/out_of_scope.txt"
 
 # Make directories
 mkdir -p $target_domains
@@ -226,15 +234,16 @@ get_wayback_urls() {
     start=$(date +%s)
 	echo -e "${FUCHSIA}[*]${NC} Subdomains to fetch with WaybackURLs. This can take a while..."
 	echo $target | waybackurls -dates | sort -u > "${waybackurls_files}waybackurls_raw.txt"
+    
     end=$(date +%s)
 	total_domains=$(wc -l < "${waybackurls_files}waybackurls_raw.txt")
     start_date=$(head -1 "${waybackurls_files}waybackurls_raw.txt" | awk '{print $1}')
     end_date=$(tail -1 "${waybackurls_files}waybackurls_raw.txt"| awk '{print $1}')
-	echo -e "${BLUE}[i]${NC} Took ${YELLOW}$(($end-$start)) seconds${NC} to fetch ${YELLOW}$total_domains domains${NC} which are saved in ${YELLOW}${waybackurls_files}waybackurls_raw.txt${NC}"
+	
+    echo -e "${BLUE}[i]${NC} Took ${YELLOW}$(($end-$start)) seconds${NC} to fetch ${YELLOW}$total_domains domains${NC} which are saved in ${YELLOW}${waybackurls_files}waybackurls_raw.txt${NC}"
 	echo -e "${BLUE}[i]${NC} From starting date ${YELLOW}$start_date${NC} till end date ${YELLOW}$end_date${NC}"
     echo -e "${FUCHSIA}[*]${NC} Saving data since ${YELLOW}$get_last_years${NC} years ago..."
 
-    # loop through last 3 years and cut off the old ones
     current_date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     x_years_ago=$(date -u -d "$current_date - $get_last_years years" +"%Y-%m-%dT%H:%M:%SZ")
 
@@ -244,10 +253,8 @@ get_wayback_urls() {
         echo "${lines[$i]}" >> "${waybackurls_files}waybackurls_last_${get_last_years}_years.txt"
     done
 
-    # remove the dates and save to waybackurls.txt
     cat "${waybackurls_files}waybackurls_last_${get_last_years}_years.txt" | awk '{print $2}' | sort -u > "${waybackurls_files}waybackurls.txt"
 
-    # check for keywords and save them in waybackurls/KEYWORD.txt (user, passw, admin, ...)
     keywords=()
 
     while true; do
@@ -268,7 +275,6 @@ get_wayback_urls() {
 
     total_domains_before=$(wc -l < $target_sub_domains)
 
-    # export the subdomins
     while IFS= read -r url; do
         if [[ "$url" =~ ^https?://([^/]+) ]]; then
             domain="${BASH_REMATCH[1]}"
@@ -295,16 +301,16 @@ check_for_downloads() {
     fi
 
     total_wayback_domains=$(wc -l < "${waybackurls_files}waybackurls_last_${get_last_years}_years.txt")
+    echo -e "${RED}[!]${NC} Active scan with ${YELLOW}$DELAY milliseconds${NC} delay..."
     echo -e "${FUCHSIA}[*]${NC} Checking for ${YELLOW}$total_wayback_domains${NC} downloadable files from the last ${YELLOW}$get_last_years${NC} years..."
 
-    # check the files to and download
     while IFS= read -r url; do
         if is_downloadable "$url"; then
             filename=$(basename "$url")
             filepath=$(echo "$url" | sed -E 's|https?://[^/]+/||; s|/[^/]*$||')
             mkdir -p "${download_files}${filepath}"
             echo -e "${FUCHSIA}[*]${NC} Downloading ${YELLOW}$url${NC}"
-            curl -sS --connect-timeout 10 --header "$HEADER" --proxy-header "$HEADER" -o "${download_files}${filepath}/$filename" "$url"
+            curl -sS --connect-timeout 10 -H "User-Agent: $HEADER" -o "${download_files}${filepath}/$filename" "$url"
         fi
 
         sleep $(awk "BEGIN {printf \"%.2f\", $DELAY/1000}")
@@ -317,15 +323,16 @@ check_for_downloads() {
 
 is_downloadable() {
     local url=$1
-    local content_type=$(curl --header "$HEADER" --proxy-header "$HEADER" -sI "$url" | grep -i "Content-Type:" | cut -d' ' -f2 | tr -d '\r')
+    local content_type=$(curl -H "User-Agent: $HEADER" -sI "$url" | grep -i "Content-Type:" | cut -d' ' -f2 | tr -d '\r')
 
-    if [ "$content_type" ]; then
+    if [ -n "$content_type" ]; then
         for type in "${allowed_types[@]}"; do
             if [[ "$content_type" == "$type" ]]; then
                 return 0
             fi
         done
     fi
+    
     return 1
 }
 
@@ -353,35 +360,39 @@ binary_search() {
 }
 
 check_scopes() {   
-    total_sub_domains=$(wc -l < "$target_redirect_for_scope_domains")
-    
-    echo -e "${FUCHSIA}[*]${NC} Checking ${YELLOW}$total_sub_domains${NC} subdomains for scope..."
+	total_sub_domains=$(wc -l < "$target_redirect_for_scope_domains")
+	    
+	echo -e "${FUCHSIA}[*]${NC} Checking ${YELLOW}$total_sub_domains${NC} subdomains for scope..."
 
 	> "$in_scope_results"
 	> "$out_of_scope_results"
 	> "$no_data_results"
 
 	if [[ ! -f "$in_scope" || ! -f "$out_of_scope" || ! -f "$target_redirect_for_scope_domains" ]]; then
-        echo -e "${RED}[!]${NC} At least one file is missing!"
-        exit 1
+	    echo -e "${RED}[!]${NC} At least one file is missing!"
+	    exit 1
 	fi
 
 	while IFS= read -r subdomain; do
         ip=$(dig +short "$subdomain")
-        
+
         if [[ -z "$ip" ]]; then
             echo "$subdomain" >> "$no_data_results"
             continue
         fi
 
-        if [[ -n "$in_scope" ]]; then
+        if [[ -s "$in_scope" ]]; then
             if echo "$ip" | grepcidr -f "$in_scope" > /dev/null; then
                 echo "$subdomain" >> "$in_scope_results"
             else
-                echo "$subdomain" >> "$out_of_scope_results"
+                if [[ -s "$out_of_scope" ]] && echo "$ip" | grepcidr -f "$out_of_scope" > /dev/null; then
+                    echo "$subdomain" >> "$out_of_scope_results"
+                else
+                    echo "$subdomain" >> "$in_scope_results"
+                fi
             fi
         else
-            if echo "$ip" | grepcidr -f "$out_of_scope" > /dev/null; then
+            if [[ -s "$out_of_scope" ]] && echo "$ip" | grepcidr -f "$out_of_scope" > /dev/null; then
                 echo "$subdomain" >> "$out_of_scope_results"
             else
                 echo "$subdomain" >> "$in_scope_results"
@@ -389,13 +400,13 @@ check_scopes() {
         fi
 	done < "$target_redirect_for_scope_domains"
     
-    total_in_scope_domains=$(wc -l < "$in_scope_results")
-    total_out_scope_domains=$(wc -l < "$out_of_scope_results")
-    total_no_data_domains=$(wc -l < "$no_data_results")
+	total_in_scope_domains=$(wc -l < "$in_scope_results")
+	total_out_scope_domains=$(wc -l < "$out_of_scope_results")
+	total_no_data_domains=$(wc -l < "$no_data_results")
 
-    echo -e "${GREEN}[+]${NC} ${YELLOW}$total_in_scope_domains${NC} Subdomains are in scope."
-    echo -e "${GREEN}[+]${NC} ${YELLOW}$total_out_scope_domains${NC} Subdomains are not in scope."
-    echo -e "${GREEN}[+]${NC} ${YELLOW}$total_no_data_domains${NC} Subdomains are not callable."
+	echo -e "${GREEN}[+]${NC} ${YELLOW}$total_in_scope_domains${NC} Subdomains are in scope."
+	echo -e "${GREEN}[+]${NC} ${YELLOW}$total_out_scope_domains${NC} Subdomains are not in scope."
+	echo -e "${GREEN}[+]${NC} ${YELLOW}$total_no_data_domains${NC} Subdomains are not callable."
 }
 
 check_xss() {
@@ -406,19 +417,16 @@ check_xss() {
 
     total_live_domains=$(wc -l < "$target_live_domains")
 
+    IFS=","
+    payloads="${dalfox_payloads_list[*]}"
+
 	echo -e "${RED}[!]${NC} Active scanning for ${YELLOW}$total_live_domains live domains${NC} with ${YELLOW}dalfox${NC} for XSS vulnerabilities with a delay of ${YELLOW}$DELAY ms${NC}..."
-    echo -e "${BLUE}[i]${NC} Using ${YELLOW}portswigger$, payloadbox${NC} as remote payloads."
+    echo -e "${BLUE}[i]${NC} Using ${YELLOW}${payloads}${NC} as remote payloads."
 
     > $xss_vulns
     
     start=$(date +%s)
-
-    if [ -z "$HEADER" ]; then
-        cat "${target_live_domains}" | dalfox pipe --config dalfox.config.json --silence --delay "$DELAY" --output $xss_vulns --remote-payloads portswigger,payloadbox
-    else
-        cat "${target_live_domains}" | dalfox pipe --config dalfox.config.json --silence --delay "$DELAY" --header $HEADER --output $xss_vulns --remote-payloads portswigger,payloadbox
-    fi
-
+    cat "$target_live_domains" | dalfox pipe --config dalfox.config.json --silence --delay "$DELAY" --output $xss_vulns --remote-payloads "$payloads"
     end=$(date +%s)
 
     echo -e "${BLUE}[i]${NC} Took ${YELLOW}$(($end-$start)) seconds${NC} to scan for XSS vulns which are saved in ${YELLOW}$xss_vulns${NC}"
@@ -478,14 +486,14 @@ handle_redirects() {
     
     > "$target_redirect_domains"
     > "$target_redirect_for_scope_domains"
-    
+
     cat "${the_harvester_files}interesting_urls.txt" >> $target_redirect_domains
     
     if [[ $total_domains -gt 0 ]]; then
 	    while read -r url; do
             ((count++))
             
-            final_url=$(curl --header "$HEADER" --proxy-header "$HEADER" --connect-timeout 10 -s -o /dev/null -w "%{url_effective}" -k -L "$url")
+            final_url=$(curl -H "User-Agent: $HEADER" --connect-timeout 10 -s -o /dev/null -w "%{url_effective}" -k -L "$url")
             # Remove the :443 port if it exists
             final_url=$(echo "$final_url" | sed 's/:443//')
             # Remove trailing slash if it exists
@@ -518,7 +526,7 @@ handle_redirects() {
 }
 
 import_in_burp() {
-    if ! curl -s --head --request GET "$PROXY_URL" | grep "200 OK" > /dev/null; then
+    if ! curl -s -H "User-Agent: $HEADER" --request GET "$PROXY_URL" | grep "200 OK" > /dev/null; then
         echo -e "${RED}[!]${NC} Warning: Burp Suite proxy at $PROXY_URL is not reachable."
         return 1
     fi
@@ -532,7 +540,7 @@ import_in_burp() {
     for live_domain in $(cat "$target_live_domains"); do
         ((count++))
         echo -e "${YELLOW}[+]${NC} Sending domain $count/$total_live_domains: $live_domain"
-        curl -s -x "$PROXY_URL" -k "$live_domain" > /dev/null
+        curl -s -H "User-Agent: $HEADER" -x "$PROXY_URL" -k "$live_domain" > /dev/null
 
         sleep $(awk "BEGIN {printf \"%.2f\", $DELAY/1000}")
     done
@@ -562,7 +570,7 @@ take_screenshots() {
 generate_html_screenshots() {
 	echo "<!DOCTYPE html><html>" > "$output_html_screenshots"
 	echo "<head><title>Screenshots from $target</title>" >> "$output_html_screenshots"
-    echo "<link rel='stylesheet' href='../../ptr/style.css'></head>" >> "$output_html_screenshots"
+    echo "${CSS}</head>" >> "$output_html_screenshots"
 	echo "<body>" >> "$output_html_screenshots"
 	echo "<h1>Screenshots from $target</h1><div class='flex'>" >> "$output_html_screenshots"
 	
@@ -581,26 +589,15 @@ generate_html_screenshots() {
 }
 
 get_open_ports() {
-    echo -e "${FUCHSIA}[*]${NC} Exporting domains to IPs for nmap..."
-    > "${nmap}ips_for_nmap.txt"
-
-    while IFS= read -r subdomain; do
-        ip=$(dig +short "$subdomain")
-
-        if [[ -n "$ip" ]]; then
-            echo $ip >> "${nmap}ips_for_nmap.txt"
-        fi
-    done < "$target_live_domains"
-
-    sort -u "${nmap}ips_for_nmap.txt" -o "${nmap}ips_for_nmap.txt"
-
-    total_ips=$(cat "${nmap}ips_for_nmap.txt" | wc -l)
+    total_ips=$(cat "${nmap}ips.txt" | wc -l)
     echo -e "${RED}[!]${NC} Active scan of ${YELLOW}$total_ips${NC} IPs for status with nmap..."
     
     start=$(date +%s)
-    while read -r ip; do    
-        sudo nmap -oN "${nmap_ports}${ip}.txt" $ip -p- -sV -O -T3
-    done < "${nmap}ips_for_nmap.txt"
+
+    while read -r ip; do
+        sudo nmap -oN "${nmap_ports}${ip}.txt" "$ip" -p- -sV -O -T3 --excludefile "$out_of_scope"
+    done < "${nmap}ips.txt"
+
     end=$(date +%s)
 
     diff=$(($end-$start))
@@ -610,7 +607,7 @@ get_open_ports() {
 
 generate_html_open_ports() {
 	echo "<!DOCTYPE html><html>" > "$output_html_open_ports"
-	echo "<head><title>Nmap scan report for $target</title><link href='../../../ptr/style.css' rel='stylesheet'></head>" >> "$output_html_open_ports"
+	echo "<head><title>Nmap scan report for $target</title>${CSS}</head>" >> "$output_html_open_ports"
 	echo "<body>" >> "$output_html_open_ports"
 	echo "<h1>Nmap scan report for $target</h1>" >> "$output_html_open_ports"
 	
@@ -618,23 +615,19 @@ generate_html_open_ports() {
 
 	for file_path in "$nmap_ports"*.txt; do
 	    ((count++))
-	    # Extract subdomain and IP address
 	    subdomain=$(grep -m 1 "Nmap scan report for" "$file_path" | awk '{print $5}')
 	    ip_address=$(grep -m 1 "Nmap scan report for" "$file_path" | awk -F '[()]' '{print $2}')
 
-	    # Check if there are open ports
 	    open_ports=$(grep -E "^[0-9]+/tcp" "$file_path")
         os_details=$(grep -m 1 "OS details" "$file_path")
 
-	    # Only generate title and table if open ports are found
 	    if [[ -n "$open_ports" ]]; then
 
 		echo "<h2>$count) $subdomain ($ip_address)</h2>" >> "$output_html_open_ports"
 		echo "<table border='1'>" >> "$output_html_open_ports"
-		echo "<tr><th>Port</th><th>State</th><th>Service</th><th>Reason</th><th>Version</th></tr>" >> "$output_html_open_ports"
+		echo "<tr><th>Port</th><th>State</th><th>Service</th><th>Version</th></tr>" >> "$output_html_open_ports"
 
-		# Add open ports to the table
-		echo "$open_ports" | awk '{print "<tr><td>"$1"</td><td>"$2"</td><td>"$3"</td><td>"$4" "$5" "$6"</td><td>"$7"</td></tr>"}' >> "$output_html_open_ports"
+		echo "$open_ports" | awk '{print "<tr><td>"$1"</td><td>"$2"</td><td>"$3"</td><td>"$4" "$5" "$6" "$7"</td></tr>"}' >> "$output_html_open_ports"
 		echo "</table><br>" >> "$output_html_open_ports"
         echo "${os_details}<br>" >> "$output_html_open_ports"
 	    fi
@@ -664,11 +657,9 @@ check_csp() {
 
         echo -e "${FUCHSIA}[*]${NC} Checking domain ${YELLOW}$count/$total_domains${NC}: ${YELLOW}$target_live${NC}"
 
-        # Convert target to a safe filename format
         safe_target=$(echo $target_live | tr -s '[:punct:]' '_' | tr ' ' '_')
 
-        # Check for Content Security Policy (CSP) in the headers
-        has_csp=$(curl --header "$HEADER" --proxy-header "$HEADER" --connect-timeout 10 -s -D - $target_live | grep -i "content-security-policy")
+        has_csp=$(curl -H "User-Agent: $HEADER" --connect-timeout 10 -s -D - $target_live | grep -i "content-security-policy")
         
         if [[ -n "$has_csp" ]]; then
             csp_content=$(echo "$has_csp" | sed 's/[Cc]ontent-[Ss]ecurity-[Pp]olicy: //I')
@@ -713,17 +704,22 @@ generate_html_csp() {
 }
 
 quick_host_up_check() {
-    echo -e "${BLUE}[i]${NC} Passive scan for hosts with ${YELLOW}dig${NC} command."
+    total_domains=$(wc -l < "$target_live_domains")
+    echo -e "${BLUE}[i]${NC} Passive scan for ${YELLOW}$total_domains${NC} hosts with ${YELLOW}ping${NC} command."
 
     > "${nmap}ips.txt"
+    > "${nmap}iplist.txt"
+    count=0
 
     while IFS= read -r subdomain; do
-        ip=$(dig +short "$subdomain")
+        ((count++))
+        echo -e "${FUCHSIA}[*]${NC} Getting IP from domain ${YELLOW}$count/$total_domains${NC}: ${YELLOW}$subdomain${NC}"
 
-        if [[ -n "$ip" ]]; then
-            echo $ip >> "${nmap}ips.txt"
-        fi
+        domain=$(echo $subdomain | sed 's~http[s]*://~~')
+        iplist=$(ping -c 1 "$domain" >> "${nmap}iplist.txt")
     done < "$target_live_domains"
+
+    grep -oP '\(\K[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "${nmap}iplist.txt" > "${nmap}ips.txt"
 
     sort -u "${nmap}ips.txt" -o "${nmap}ips.txt"
 
@@ -736,10 +732,46 @@ quick_host_up_check() {
 
         while IFS= read -r ip; do
             if [[ -n "$ip" ]]; then
-                nmap -oN "${nmap_hosts}/${ip}.txt" "$ip" -p-
+                nmap -oN "${nmap_hosts}/${ip}.txt" "$ip" --excludefile "$out_of_scope"
             fi
         done < "${nmap}ips.txt"
     fi
+
+    total_hosts=$(ls -1 "$nmap_hosts" | wc -l)
+    echo -e "${GREEN}[+]${NC} ${YELLOW}$total_hosts${NC} Hosts are up."
+}
+
+generate_html_quickhost_up() {
+	echo "<!DOCTYPE html><html>" > "$output_html_hosts_up"
+	echo "<head><title>Quick host up check report for $target</title>${CSS}</head>" >> "$output_html_hosts_up"
+	echo "<body>" >> "$output_html_hosts_up"
+	echo "<h1>Quick host up check report for $target</h1>" >> "$output_html_hosts_up"
+	
+	count=0
+
+	for file_path in "$nmap_hosts"*.txt; do
+	    ((count++))
+	    subdomain=$(grep -m 1 "Nmap scan report for" "$file_path" | awk '{print $5}')
+	    ip_address=$(grep -m 1 "Nmap scan report for" "$file_path" | awk -F '[()]' '{print $2}')
+
+	    ports=$(grep -E "^[0-9]+/tcp" "$file_path")
+
+	    if [[ -n "$ports" ]]; then
+            echo "<h2>$count) $subdomain ($ip_address)</h2>" >> "$output_html_hosts_up"
+            echo "<table border='1'>" >> "$output_html_hosts_up"
+            echo "<tr><th>Port</th><th>State</th><th>Service</th></tr>" >> "$output_html_hosts_up"
+
+            echo "$ports" | awk '{
+                color = ($2 == "open") ? "green" : "red";
+                print "<tr><td>"$1"</td><td><span style=\"color:" color "\">" $2 "</span></td><td>" $3 " " $4 " " $5 " " $6 "</td></tr>"
+            }' >> "$output_html_hosts_up"
+
+            echo "</table><br>" >> "$output_html_hosts_up"
+	    fi
+	done
+
+	echo "</body></html>" >> "$output_html_hosts_up"
+	echo -e "${GREEN}[+]${NC} Nmap scan report with ${YELLOW}$count${NC} subdomains generated under ${YELLOW}$output_html_hosts_up${NC}"
 }
 
 remove_directories() {
@@ -855,9 +887,10 @@ while true; do
                 echo "4. Generate HTML output of screenshots"
                 echo "5. Import into Burp Suite"
                 echo "6. Quick host up check (IP/range nmap)"
-                echo "7. Get open ports (nmap)"
-                echo "8. Generate report of open ports"
-                echo "9. Check for downloads"
+                echo "7. Generate HTML output of up hosts"
+                echo "8. Get open ports (nmap)"
+                echo "9. Generate report of open ports"
+                echo "10. Check for downloads"
                 echo "x. Back to Main Menu"
                 read -p "Select an option: " reporting_option
 
@@ -868,9 +901,10 @@ while true; do
                     4) generate_html_screenshots ;;
                     5) import_in_burp ;;
                     6) quick_host_up_check ;;
-                    7) get_open_ports ;;
-                    8) generate_html_open_ports ;;
-                    9) check_for_downloads ;;
+                    7) generate_html_quickhost_up ;;
+                    8) get_open_ports ;;
+                    9) generate_html_open_ports ;;
+                    10) check_for_downloads ;;
                     x) break ;;
                     *) echo -e "${RED}[!]${NC} Invalid option." ;;
                 esac
