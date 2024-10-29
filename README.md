@@ -47,9 +47,10 @@ x. Back to Main Menu
 4. Generate HTML output of screenshots
 5. Import into Burp Suite
 6. Quick host up check (IP/range nmap)
-7. Get open ports (nmap)
-8. Generate report of open ports
-9. Check for downloads
+7. Generate HTML output of up hosts
+8. Get open ports (nmap)
+9. Generate report of open ports
+10. Check for downloads
 x. Back to Main Menu
 ```
 ### Cleanup
