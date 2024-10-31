@@ -402,28 +402,33 @@ is_downloadable() {
 }
 
 generate_preview_of_downloads() {
+    start=$(date +%s)
     echo "<!DOCTYPE html>
         <html lang='de'>
         <head>
             <meta charset='UTF-8'>
             <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-            <title>Media preview</title>
+            <title>Media preview of $target</title>
             $CSS
         </head>
         <body>
-            <h1>Media preview</h1>
-            <div class='grid'>" > "$output_html_downloads"
+            <h1>Media preview of $target</h1>
+            <div class='grid-container'>" > "$output_html_downloads"
 
     for ext in "${allowed_extensions[@]}"; do
         if [[ " ${media_extensions[@]} " =~ " ${ext} " ]]; then
             find "$downloads" -type f -iname "*.$ext" | while read -r file; do
                 filesize=$(stat -c%s "$file")
-                echo "<div class='item'><img src='$file'><div>${filesize} Bytes</div></div>" >> "$output_html_downloads"
+                filesize_kb=`du -k "$file" | cut -f1`
+                image=$(echo $file | sed "s|$downloads||")
+                echo "<div class='grid-item'><a href='$image' target='_blank'><img src='$image'></a><div>${filesize_kb}KB ($ext)</div></div>" >> "$output_html_downloads"
             done
         else
             find "$downloads" -type f -iname "*.$ext" | while read -r file; do
                 filesize=$(stat -c%s "$file")
-                echo "<div class='item'><a href='$file'>$(basename "$file")</a><div>${filesize} Bytes</div></div>" >> "$output_html_downloads"
+                filesize_kb=`du -k "$file" | cut -f1`
+                document=$(echo $file | sed "s|$downloads||")
+                echo "<div class='grid-item'><a href='$document' target='_blank'>$(basename "$document")</a><div>${filesize_kb}KB ($ext)</div></div>" >> "$output_html_downloads"
             done
         fi
     done
@@ -432,8 +437,9 @@ generate_preview_of_downloads() {
     echo "</div>
         </body>
         </html>" >> "$output_html_downloads"
+    end=$(date +%s)
     
-   	echo -e "${GREEN}[+]${NC} HTML output for preview of the downloads is generated under: ${YELLOW}$output_html_downloads${NC}"
+   	echo -e "${GREEN}[+]${NC} Took ${YELLOW}$((end-start)) seconds${NC} for HTML output for preview of the downloads is generated under: ${YELLOW}$output_html_downloads${NC}"
 }
 
 check_scopes() {   
@@ -503,7 +509,7 @@ check_xss() {
     > $xss_vulns
     
     start=$(date +%s)
-    cat "$target_live_domains" | dalfox pipe --config dalfox.config.json --silence --delay "$DELAY" --output $xss_vulns --remote-payloads "$payloads"
+    cat "$target_live_domains" | dalfox pipe --user-agent "$USERAGENT" --delay "$DELAY" --output $xss_vulns --remote-payloads "$payloads"
     end=$(date +%s)
 
     echo -e "${BLUE}[i]${NC} Took ${YELLOW}$(($end-$start)) seconds${NC} to scan for XSS vulns which are saved in ${YELLOW}$xss_vulns${NC}"
@@ -593,7 +599,7 @@ handle_redirects() {
     
     sort -u "$target_redirect_domains" -o "$target_redirect_domains"
     
-    awk -F[/:] '{print $4}' "$target_redirect_domains" | sort -u >> "$target_redirect_for_scope_domains"
+    awk -F[/:] '{print $4}' "$target_redirect_domains" | sort -u > "$target_redirect_for_scope_domains"
     
     total_redirect_domains=$(wc -l < "$target_redirect_domains")
     echo -e "${GREEN}[+]${NC} ${YELLOW}$total_redirect_domains${NC} redirected subdomains saved to ${YELLOW}$target_redirect_domains${NC}"
@@ -878,7 +884,7 @@ display_banner() {
     echo "                     Version $VERSION"
     echo "          Created by SirOcram aka 0xFF00FF"
     echo -e "       For domain: ${YELLOW}$target${NC}"
-    echo -e "${GREEN}  User-Agent: $USERAGENT"
+    echo -e "${GREEN}User-Agent: $USERAGENT${NC}"
     echo ""
 }
 
@@ -887,12 +893,12 @@ while true; do
     display_banner
 
     echo -e "${FUCHSIA}==================== Main Menu =====================${NC}"
-    echo "1. Subdomain Enumeration and Reconnaissance"
-    echo "2. Domain Check and Scope Handling"
-    echo "3. Security Tests"
-    echo "4. Reporting and Import"
-    echo "5. Cleanup"
-    echo "x. Exit"
+    echo -e "${FUCHSIA}1.${NC} Subdomain Enumeration and Reconnaissance"
+    echo -e "${FUCHSIA}2.${NC} Domain Check and Scope Handling"
+    echo -e "${FUCHSIA}3.${NC} Security Tests"
+    echo -e "${FUCHSIA}4.${NC} Reporting and Import"
+    echo -e "${FUCHSIA}5.${NC} Cleanup"
+    echo -e "${FUCHSIA}x.${NC} Exit"
     read -p "Select a category: " main_option
 
     case $main_option in
@@ -901,10 +907,10 @@ while true; do
                 display_banner
 
                 echo -e "${FUCHSIA}===== Subdomain Enumeration and Reconnaissance =====${NC}"
-                echo "1. Get all subdomains (assetfinder, subfinder)"
-                echo "2. Get theHarvester entries"
-                echo "3. Get WaybackURLs"
-                echo "x. Back to Main Menu"
+                echo -e "${FUCHSIA}1.${NC} Get all subdomains (assetfinder, subfinder, sublist3r)"
+                echo -e "${FUCHSIA}2.${NC} Get theHarvester entries"
+                echo -e "${FUCHSIA}3.${NC} Get WaybackURLs"
+                echo -e "${FUCHSIA}x.${NC} Back to Main Menu"
                 read -p "Select an option: " subdomain_option
 
                 case $subdomain_option in
@@ -921,10 +927,10 @@ while true; do
                 display_banner
 
                 echo -e "${FUCHSIA}========= Domain Check and Scope Handling ==========${NC}"
-                echo "1. Handle redirects"
-                echo "2. Check scopes"
-                echo "3. Check for live domains (httprobe)"
-                echo "x. Back to Main Menu"
+                echo -e "${FUCHSIA}1.${NC} Handle redirects"
+                echo -e "${FUCHSIA}2.${NC} Check scopes"
+                echo -e "${FUCHSIA}3.${NC} Check for live domains (httprobe)"
+                echo -e "${FUCHSIA}x.${NC} Back to Main Menu"
                 read -p "Select an option: " domain_option
 
                 case $domain_option in
@@ -941,9 +947,9 @@ while true; do
                 display_banner
 
                 echo -e "${FUCHSIA}================== Security Tests ==================${NC}"
-                echo "1. Check CSP"
-                echo "2. Check XSS with Dalfox"
-                echo "x. Back to Main Menu"
+                echo -e "${FUCHSIA}1.${NC} Check CSP"
+                echo -e "${FUCHSIA}2.${NC} Check XSS with Dalfox"
+                echo -e "${FUCHSIA}x.${NC} Back to Main Menu"
                 read -p "Select an option: " security_option
 
                 case $security_option in
@@ -959,18 +965,18 @@ while true; do
                 display_banner
 
                 echo -e "${FUCHSIA}=============== Reporting and Import ===============${NC}"
-                echo "1. Generate report of CSP"
-                echo "2. Generate report of XSS"
-                echo "3. Take screenshots (gowitness)"
-                echo "4. Generate HTML output of screenshots"
-                echo "5. Import into Burp Suite"
-                echo "6. Quick host up check (IP/range nmap)"
-                echo "7. Generate HTML output of up hosts"
-                echo "8. Get open ports (nmap)"
-                echo "9. Generate report of open ports"
-                echo "10. Check for downloads"
-                echo "11. Generate preview of downloads"
-                echo "x. Back to Main Menu"
+                echo -e "${FUCHSIA}1.${NC} Generate report of CSP"
+                echo -e "${FUCHSIA}2.${NC} Generate report of XSS"
+                echo -e "${FUCHSIA}3.${NC} Take screenshots (gowitness)"
+                echo -e "${FUCHSIA}4.${NC} Generate HTML output of screenshots"
+                echo -e "${FUCHSIA}5.${NC} Import into Burp Suite"
+                echo -e "${FUCHSIA}6.${NC} Quick host up check (IP/range nmap)"
+                echo -e "${FUCHSIA}7.${NC} Generate HTML output of up hosts"
+                echo -e "${FUCHSIA}8.${NC} Get open ports (nmap)"
+                echo -e "${FUCHSIA}9.${NC} Generate report of open ports"
+                echo -e "${FUCHSIA}10.${NC}Check for downloads"
+                echo -e "${FUCHSIA}11.${NC}Generate preview of downloads"
+                echo -e "${FUCHSIA}x.${NC} Back to Main Menu"
                 read -p "Select an option: " reporting_option
 
                 case $reporting_option in
@@ -995,15 +1001,15 @@ while true; do
                 display_banner
 
                 echo -e "${FUCHSIA}===================== Cleanup ======================${NC}"
-                echo "1. Cleanup all files"
-                echo "2. Cleanup domains"
-                echo "3. Cleanup downloads"
-                echo "4. Cleanup nmap"
-                echo "5. Cleanup screenshots"
-                echo "6. Cleanup security"
-                echo "7. Cleanup theHarvester"
-                echo "8. Cleanup waybackURLs"
-                echo "x. Back to Main Menu"
+                echo -e "${FUCHSIA}1.${NC} Cleanup all files"
+                echo -e "${FUCHSIA}2.${NC} Cleanup domains"
+                echo -e "${FUCHSIA}3.${NC} Cleanup downloads"
+                echo -e "${FUCHSIA}4.${NC} Cleanup nmap"
+                echo -e "${FUCHSIA}5.${NC} Cleanup screenshots"
+                echo -e "${FUCHSIA}6.${NC} Cleanup security"
+                echo -e "${FUCHSIA}7.${NC} Cleanup theHarvester"
+                echo -e "${FUCHSIA}8.${NC} Cleanup waybackURLs"
+                echo -e "${FUCHSIA}x.${NC} Back to Main Menu"
                 read -p "Select an option: " cleanup_option
 
                 case $cleanup_option in
@@ -1029,7 +1035,6 @@ while true; do
             done
             ;;
         x)
-            echo "Exiting..."
             exit 0
             ;;
         *)
