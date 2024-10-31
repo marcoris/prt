@@ -51,6 +51,7 @@ x. Back to Main Menu
 8. Get open ports (nmap)
 9. Generate report of open ports
 10. Check for downloads
+11. Generate preview of downloads
 x. Back to Main Menu
 ```
 ### Cleanup
@@ -77,6 +78,9 @@ x. Back to Main Menu
 
 ## nmap scan results
 ![image](https://github.com/user-attachments/assets/02a1cc3a-cf03-4888-8820-b26bf42f8401)
+
+## Downloaded files
+![image](https://github.com/user-attachments/assets/d4a1d268-45b1-4f79-9d2e-a6c0ed5935c4)
 
 ## Workflow
 ![image](https://github.com/user-attachments/assets/2cae0dbb-ca35-4e21-b9ad-5a5e4af4e4b0)
