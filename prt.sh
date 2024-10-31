@@ -5,24 +5,20 @@ source .env
 
 # Variables
 VERSION="1.0.0"
-allowed_types=(
-    "application/pdf"
-    "application/zip"
-    "application/json"
-    "application/xml"
-    "application/octet-stream"
-    "text/plain"
-    "application/msword"
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    "application/vnd.ms-excel"
-    "image/jpeg"
-    "image/png"
-    "image/gif"
-    "audio/mpeg"
-    "audio/wav"
-    "video/mp4"
-)
+
+merge_arrays() {
+    local merged_array=()
+    for ext in "${media_extensions[@]}"; do
+        merged_array+=("$ext")
+    done
+    for ext in "${document_extensions[@]}"; do
+        merged_array+=("$ext")
+    done
+    echo "${merged_array[@]}"
+}
+
+allowed_extensions=($(merge_arrays))
+
 tools=(
     assetfinder
     csp
@@ -72,7 +68,7 @@ no_data_results="${target_domains}no_data_subdomains.txt"
 # Directory/file arguments
 the_harvester_files="../${WEBAPP_DIR}/$target/theharvester/"
 target_theharvester="${the_harvester_files}theHarvester.json"
-download_files="../${WEBAPP_DIR}/$target/downloads/"
+downloads="../${WEBAPP_DIR}/$target/downloads/"
 waybackurls_files="../${WEBAPP_DIR}/$target/waybackurls/"
 screenshots="../${WEBAPP_DIR}/$target/screenshots/"
 security="../${WEBAPP_DIR}/$target/security/"
@@ -84,9 +80,12 @@ csp_no_file="${csp_files}no/"
 nmap="../${WEBAPP_DIR}/$target/nmap/"
 nmap_ports="${nmap}ports/"
 nmap_hosts="${nmap}hosts/"
+
+# HTML outputs
 output_html_open_ports="${nmap}open-ports-report.html"
 output_html_hosts_up="${nmap}hosts-up-report.html"
 output_html_screenshots="${screenshots}screenshots.html"
+output_html_downloads="${downloads}downloads.html"
 output_html_csp="${security}csp-report.html"
 output_html_xss="${security}xss-report.html"
 
@@ -99,7 +98,7 @@ out_of_scope="../${WEBAPP_DIR}/$target/out_of_scope.txt"
 # Make directories
 mkdir -p $target_domains
 mkdir -p $the_harvester_files
-mkdir -p $download_files
+mkdir -p $downloads
 mkdir -p $waybackurls_files
 mkdir -p $screenshots
 mkdir -p $nmap_ports
@@ -218,7 +217,6 @@ get_wayback_urls() {
         echo -e "${YELLOW}[?]${NC} How many years back should I scan for the domain? (default is 3):"
         read -r answer
 
-        # Use default value 3 if no input is provided
         answer=${answer:-3}
 
         if [[ "$answer" =~ ^[0-9]+$ ]]; then
@@ -294,49 +292,6 @@ get_wayback_urls() {
     echo -e "${BLUE}[i]${NC} ${YELLOW}$total_domains_before${NC} Subdomains before and ${YELLOW}$total_domains_after${NC} subdomains after are saved in ${YELLOW}$target_sub_domains${NC}"
 }
 
-check_for_downloads() {
-    if [ ! -n "$get_last_years" ]; then
-        echo -e "${RED}[!]${NC} You first have to run the waybackurls menu entry: ${YELLOW}1.3${NC}"
-        exit 1
-    fi
-
-    total_wayback_domains=$(wc -l < "${waybackurls_files}waybackurls_last_${get_last_years}_years.txt")
-    echo -e "${RED}[!]${NC} Active scan with ${YELLOW}$DELAY milliseconds${NC} delay..."
-    echo -e "${FUCHSIA}[*]${NC} Checking for ${YELLOW}$total_wayback_domains${NC} downloadable files from the last ${YELLOW}$get_last_years${NC} years..."
-
-    while IFS= read -r url; do
-        if is_downloadable "$url"; then
-            filename=$(basename "$url")
-            filepath=$(echo "$url" | sed -E 's|https?://[^/]+/||; s|/[^/]*$||')
-            mkdir -p "${download_files}${filepath}"
-            echo -e "${FUCHSIA}[*]${NC} Downloading ${YELLOW}$url${NC}"
-            curl -sS --connect-timeout 10 -H "User-Agent: $HEADER" -o "${download_files}${filepath}/$filename" "$url"
-        fi
-
-        sleep $(awk "BEGIN {printf \"%.2f\", $DELAY/1000}")
-    done < "${waybackurls_files}waybackurls_last_${get_last_years}_years.txt"
-
-    total_download_dirs=$(ls -1 "$download_files" | wc -l)
-    total_downloaded_files=$(find "$download_files" -type f | wc -l)
-    echo -e "${GREEN}[+]${NC} ${YELLOW}$total_downloaded_files${NC} files were downloaded in ${YELLOW}$total_download_dirs${NC} directories to ${YELLOW}$download_files${NC}"
-}
-
-is_downloadable() {
-    local url=$1
-    local content_type=$(curl -H "User-Agent: $HEADER" -sI "$url" | grep -i "Content-Type:" | cut -d' ' -f2 | tr -d '\r')
-
-    if [ -n "$content_type" ]; then
-        for type in "${allowed_types[@]}"; do
-            if [[ "$content_type" == "$type" ]]; then
-                return 0
-            fi
-        done
-    fi
-    
-    return 1
-}
-
-# Function to get the date from 1998-12-01T06:00:43Z URL
 get_date_from_line() {
     echo "$1" | cut -d' ' -f1
 }
@@ -357,6 +312,128 @@ binary_search() {
         fi
     done
     echo $low
+}
+
+check_for_downloads() {
+    if [ ! -n "$get_last_years" ]; then
+        echo -e "${YELLOW}[?]${NC} The variable 'get_last_years' is not set. Enter the number of years back for the waybackurls file: "
+        read -r get_last_years
+    fi
+
+    max_attempts=5
+    attempts=0
+    
+    while (( attempts < max_attempts )); do
+        file_name="${waybackurls_files}waybackurls_last_${get_last_years}_years.txt"
+
+        if [[ -f "$file_name" ]]; then
+            echo -e "${GREEN}[+]${NC} File $file_name found and will be used."
+            break
+        else
+            echo -e "${RED}[!]${NC} File $file_name after $max_attempts attempts not found. Returning to menu entry 1.3 waybackurls."
+            ((attempts++))
+
+            if (( attempts < max_attempts )); then
+                echo -e "${YELLOW}[?]${NC} Enter a different number of years back (Attempt $((attempts + 1)) of $max_attempts):"
+                read -r get_last_years
+            fi
+        fi
+    done
+
+    total_wayback_domains=$(wc -l < "${waybackurls_files}waybackurls_last_${get_last_years}_years.txt")
+    echo -e "${RED}[!]${NC} Active scan..."
+    echo -e "${FUCHSIA}[*]${NC} Checking for ${YELLOW}$total_wayback_domains${NC} downloadable files from the last ${YELLOW}$get_last_years${NC} years..."
+
+    download_count=0
+
+    while read -r line; do
+        url="${line##* }"
+        ((total_wayback_domains--))
+
+        if is_extension_allowed "$url"; then
+            if is_downloadable "$url"; then
+                filename=$(basename "$url")
+                filepath=$(echo "$url" | sed -E 's|https?://[^/]+/||; s|/[^/]*$||')
+                domain=$(echo "$url" | sed -E 's|https?://([^/]+)/.*|\1|')
+                mkdir -p "${downloads}${domain}/${filepath}"
+                echo -e "${FUCHSIA}[*]${NC} Downloading ${YELLOW}$url${NC}"
+                curl -sS --connect-timeout 10 -H "User-Agent: $USERAGENT" -o "${downloads}${domain}/${filepath}/$filename" "$url"
+
+                ((download_count++))
+                if (( download_count % 10 == 0 )); then
+                    echo -e "${GREEN}[+]${NC} ${YELLOW}$download_count files${NC} downloaded so far. Still ${YELLOW}$total_wayback_domains${NC} to check..."
+                fi
+            else
+                echo -e "${RED}[!]${NC} Not downloadable: ${RED}$url${NC}"
+            fi
+        fi
+    done < "${waybackurls_files}waybackurls_last_${get_last_years}_years.txt"
+
+    total_download_dirs=$(ls -1 "$downloads" | wc -l)
+    total_downloaded_files=$(find "$downloads" -type f | wc -l)
+    echo -e "${GREEN}[+]${NC} ${YELLOW}$total_downloaded_files${NC} files were downloaded in ${YELLOW}$total_download_dirs${NC} directories to ${YELLOW}$downloads${NC}"
+}
+
+is_extension_allowed() {
+    url="$1"
+    extension="${url##*.}"
+
+    for allowed_extension in "${allowed_extensions[@]}"; do
+        if [[ "$extension" == "$allowed_extension" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+is_downloadable() {
+    local url=$1
+    local content_type=$(curl -H "User-Agent: $USERAGENT" -sI "$url" | grep -i "Content-Type:" | cut -d' ' -f2 | tr -d '\r')
+
+    if [ -n "$content_type" ]; then
+        for type in "${allowed_content_types[@]}"; do
+            if [[ "$content_type" == "$type" ]]; then
+                return 0
+            fi
+        done
+    fi
+    
+    return 1
+}
+
+generate_preview_of_downloads() {
+    echo "<!DOCTYPE html>
+        <html lang='de'>
+        <head>
+            <meta charset='UTF-8'>
+            <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+            <title>Media preview</title>
+            $CSS
+        </head>
+        <body>
+            <h1>Media preview</h1>
+            <div class='grid'>" > "$output_html_downloads"
+
+    for ext in "${allowed_extensions[@]}"; do
+        if [[ " ${media_extensions[@]} " =~ " ${ext} " ]]; then
+            find "$downloads" -type f -iname "*.$ext" | while read -r file; do
+                filesize=$(stat -c%s "$file")
+                echo "<div class='item'><img src='$file'><div>${filesize} Bytes</div></div>" >> "$output_html_downloads"
+            done
+        else
+            find "$downloads" -type f -iname "*.$ext" | while read -r file; do
+                filesize=$(stat -c%s "$file")
+                echo "<div class='item'><a href='$file'>$(basename "$file")</a><div>${filesize} Bytes</div></div>" >> "$output_html_downloads"
+            done
+        fi
+    done
+
+    # HTML-Datei abschließen
+    echo "</div>
+        </body>
+        </html>" >> "$output_html_downloads"
+    
+   	echo -e "${GREEN}[+]${NC} HTML output for preview of the downloads is generated under: ${YELLOW}$output_html_downloads${NC}"
 }
 
 check_scopes() {   
@@ -493,7 +570,7 @@ handle_redirects() {
 	    while read -r url; do
             ((count++))
             
-            final_url=$(curl -H "User-Agent: $HEADER" --connect-timeout 10 -s -o /dev/null -w "%{url_effective}" -k -L "$url")
+            final_url=$(curl -H "User-Agent: $USERAGENT" --connect-timeout 10 -s -o /dev/null -w "%{url_effective}" -k -L "$url")
             # Remove the :443 port if it exists
             final_url=$(echo "$final_url" | sed 's/:443//')
             # Remove trailing slash if it exists
@@ -526,8 +603,8 @@ handle_redirects() {
 }
 
 import_in_burp() {
-    if ! curl -s -H "User-Agent: $HEADER" --request GET "$PROXY_URL" | grep "200 OK" > /dev/null; then
-        echo -e "${RED}[!]${NC} Warning: Burp Suite proxy at $PROXY_URL is not reachable."
+    if ! curl -s -H "User-Agent: $USERAGENT" --request GET "$PROXY_HOST" | grep "200 OK" > /dev/null; then
+        echo -e "${RED}[!]${NC} Warning: Burp Suite proxy at $PROXY_HOST is not reachable."
         return 1
     fi
 
@@ -540,7 +617,7 @@ import_in_burp() {
     for live_domain in $(cat "$target_live_domains"); do
         ((count++))
         echo -e "${YELLOW}[+]${NC} Sending domain $count/$total_live_domains: $live_domain"
-        curl -s -H "User-Agent: $HEADER" -x "$PROXY_URL" -k "$live_domain" > /dev/null
+        curl -s -H "User-Agent: $USERAGENT" -x "$PROXY_HOST" -k "$live_domain" > /dev/null
 
         sleep $(awk "BEGIN {printf \"%.2f\", $DELAY/1000}")
     done
@@ -570,13 +647,12 @@ take_screenshots() {
 generate_html_screenshots() {
 	echo "<!DOCTYPE html><html>" > "$output_html_screenshots"
 	echo "<head><title>Screenshots from $target</title>" >> "$output_html_screenshots"
-    echo "${CSS}</head>" >> "$output_html_screenshots"
+    echo "$CSS</head>" >> "$output_html_screenshots"
 	echo "<body>" >> "$output_html_screenshots"
 	echo "<h1>Screenshots from $target</h1><div class='flex'>" >> "$output_html_screenshots"
 	
 	count=0
 
-	# Loop through all Nmap scan files in the directory
 	for img in "${screenshots}"*.jpeg; do
 	    if [[ -f "$img" ]]; then
             ((count++))
@@ -588,6 +664,77 @@ generate_html_screenshots() {
 	echo -e "${GREEN}[+]${NC} ${YELLOW}$count${NC} screenshots were saved in ${YELLOW}$output_html_screenshots${NC}"
 }
 
+quick_host_up_check() {
+    total_domains=$(wc -l < "$target_live_domains")
+    echo -e "${BLUE}[i]${NC} Passive scan for ${YELLOW}$total_domains${NC} hosts with ${YELLOW}ping${NC} command."
+
+    > "${nmap}ips.txt"
+    > "${nmap}iplist.txt"
+    count=0
+
+    while IFS= read -r subdomain; do
+        ((count++))
+        echo -e "${FUCHSIA}[*]${NC} Getting IP from domain ${YELLOW}$count/$total_domains${NC}: ${YELLOW}$subdomain${NC}"
+
+        domain=$(echo $subdomain | sed 's~http[s]*://~~')
+        iplist=$(ping -c 1 "$domain" >> "${nmap}iplist.txt")
+    done < "$target_live_domains"
+
+    grep -oP '\(\K[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "${nmap}iplist.txt" > "${nmap}ips.txt"
+
+    sort -u "${nmap}ips.txt" -o "${nmap}ips.txt"
+
+    total_ips=$(wc -l < "${nmap}ips.txt")
+
+    echo -e "${GREEN}[+]${NC} ${YELLOW}$total_ips${NC} IPs saved to ${YELLOW}${nmap}ips.txt${NC}"
+
+    if [ "$total_ips" -gt 0 ]; then
+        echo -e "${RED}[i]${NC} Quick active scan for hosts with nmap."
+
+        while IFS= read -r ip; do
+            if [[ -n "$ip" ]]; then
+                nmap -Pn -oN "${nmap_hosts}/${ip}.txt" "$ip" --script-args http.useragent="$USERAGENT"
+            fi
+        done < "${nmap}ips.txt"
+    fi
+
+    total_hosts=$(ls -1 "$nmap_hosts" | wc -l)
+    echo -e "${GREEN}[+]${NC} ${YELLOW}$total_hosts${NC} Hosts are up."
+}
+
+generate_html_quickhost_up() {
+	echo "<!DOCTYPE html><html>" > "$output_html_hosts_up"
+	echo "<head><title>Quick host up check report for $target</title>${CSS}</head>" >> "$output_html_hosts_up"
+	echo "<body>" >> "$output_html_hosts_up"
+	echo "<h1>Quick host up check report for $target</h1>" >> "$output_html_hosts_up"
+	
+	count=0
+
+	for file_path in "$nmap_hosts"*.txt; do
+	    ((count++))
+	    subdomain=$(grep -m 1 "Nmap scan report for" "$file_path" | awk '{print $5}')
+	    ip_address=$(grep -m 1 "Nmap scan report for" "$file_path" | awk -F '[()]' '{print $2}')
+
+	    ports=$(grep -E "^[0-9]+/tcp" "$file_path")
+
+	    if [[ -n "$ports" ]]; then
+            echo "<h2>$count) $subdomain ($ip_address)</h2>" >> "$output_html_hosts_up"
+            echo "<table border='1'>" >> "$output_html_hosts_up"
+            echo "<tr><th>Port</th><th>State</th><th>Service</th><th>Version</th></tr>" >> "$output_html_hosts_up"
+
+            echo "$ports" | awk '{
+                color = ($2 == "open") ? "green" : "red";
+                print "<tr><td>"$1"</td><td><span style=\"color:" color "\">"$2"</span></td><td>"$3" "$4" "$5" "$6"</td><td>"$7" "$8" "$9" "$10"</td></tr>"
+            }' >> "$output_html_hosts_up"
+
+            echo "</table><br>" >> "$output_html_hosts_up"
+	    fi
+	done
+
+	echo "</body></html>" >> "$output_html_hosts_up"
+	echo -e "${GREEN}[+]${NC} Nmap scan report with ${YELLOW}$count${NC} IPs generated under ${YELLOW}$output_html_hosts_up${NC}"
+}
+
 get_open_ports() {
     total_ips=$(cat "${nmap}ips.txt" | wc -l)
     echo -e "${RED}[!]${NC} Active scan of ${YELLOW}$total_ips${NC} IPs for status with nmap..."
@@ -595,7 +742,7 @@ get_open_ports() {
     start=$(date +%s)
 
     while read -r ip; do
-        sudo nmap -oN "${nmap_ports}${ip}.txt" "$ip" -p- -sV -O -T3 --excludefile "$out_of_scope"
+        nmap -sV -oN "${nmap_ports}${ip}.txt" "$ip" -T3 --script-args http.useragent="$USERAGENT"
     done < "${nmap}ips.txt"
 
     end=$(date +%s)
@@ -618,23 +765,25 @@ generate_html_open_ports() {
 	    subdomain=$(grep -m 1 "Nmap scan report for" "$file_path" | awk '{print $5}')
 	    ip_address=$(grep -m 1 "Nmap scan report for" "$file_path" | awk -F '[()]' '{print $2}')
 
-	    open_ports=$(grep -E "^[0-9]+/tcp" "$file_path")
+	    ports=$(grep -E "^[0-9]+/tcp" "$file_path")
         os_details=$(grep -m 1 "OS details" "$file_path")
 
-	    if [[ -n "$open_ports" ]]; then
+	    if [[ -n "$ports" ]]; then
+            echo "<h2>$count) $subdomain ($ip_address)</h2>" >> "$output_html_open_ports"
+            echo "<table border='1'>" >> "$output_html_open_ports"
+            echo "<tr><th>Port</th><th>State</th><th>Service</th><th>Version</th></tr>" >> "$output_html_open_ports"
 
-		echo "<h2>$count) $subdomain ($ip_address)</h2>" >> "$output_html_open_ports"
-		echo "<table border='1'>" >> "$output_html_open_ports"
-		echo "<tr><th>Port</th><th>State</th><th>Service</th><th>Version</th></tr>" >> "$output_html_open_ports"
-
-		echo "$open_ports" | awk '{print "<tr><td>"$1"</td><td>"$2"</td><td>"$3"</td><td>"$4" "$5" "$6" "$7"</td></tr>"}' >> "$output_html_open_ports"
-		echo "</table><br>" >> "$output_html_open_ports"
-        echo "${os_details}<br>" >> "$output_html_open_ports"
+            echo "$ports" | awk '{
+                color = ($2 == "open") ? "green" : "red";
+                print "<tr><td>"$1"</td><td>"$2"</td><td>"$3"</td><td>"$4" "$5" "$6" "$7" "$8" "$9" "$10"</td></tr>"
+            }' >> "$output_html_open_ports"
+            echo "</table><br>" >> "$output_html_open_ports"
+            echo "${os_details}<br>" >> "$output_html_open_ports"
 	    fi
 	done
 
 	echo "</body></html>" >> "$output_html_open_ports"
-	echo -e "${GREEN}[+]${NC} Nmap scan report with ${YELLOW}$count${NC} subdomains generated under ${YELLOW}$output_html_open_ports${NC}"
+	echo -e "${GREEN}[+]${NC} Nmap scan report with ${YELLOW}$count${NC} IPs generated under ${YELLOW}$output_html_open_ports${NC}"
 }
 
 check_csp() {
@@ -659,7 +808,7 @@ check_csp() {
 
         safe_target=$(echo $target_live | tr -s '[:punct:]' '_' | tr ' ' '_')
 
-        has_csp=$(curl -H "User-Agent: $HEADER" --connect-timeout 10 -s -D - $target_live | grep -i "content-security-policy")
+        has_csp=$(curl -H "User-Agent: $USERAGENT" --connect-timeout 10 -s -D - $target_live | grep -i "content-security-policy")
         
         if [[ -n "$has_csp" ]]; then
             csp_content=$(echo "$has_csp" | sed 's/[Cc]ontent-[Ss]ecurity-[Pp]olicy: //I')
@@ -703,77 +852,6 @@ generate_html_csp() {
     echo -e "${GREEN}[+]${NC} HTML report generated under ${YELLOW}$output_html_csp${NC}"
 }
 
-quick_host_up_check() {
-    total_domains=$(wc -l < "$target_live_domains")
-    echo -e "${BLUE}[i]${NC} Passive scan for ${YELLOW}$total_domains${NC} hosts with ${YELLOW}ping${NC} command."
-
-    > "${nmap}ips.txt"
-    > "${nmap}iplist.txt"
-    count=0
-
-    while IFS= read -r subdomain; do
-        ((count++))
-        echo -e "${FUCHSIA}[*]${NC} Getting IP from domain ${YELLOW}$count/$total_domains${NC}: ${YELLOW}$subdomain${NC}"
-
-        domain=$(echo $subdomain | sed 's~http[s]*://~~')
-        iplist=$(ping -c 1 "$domain" >> "${nmap}iplist.txt")
-    done < "$target_live_domains"
-
-    grep -oP '\(\K[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "${nmap}iplist.txt" > "${nmap}ips.txt"
-
-    sort -u "${nmap}ips.txt" -o "${nmap}ips.txt"
-
-    total_ips=$(wc -l < "${nmap}ips.txt")
-
-    echo -e "${GREEN}[+]${NC} ${YELLOW}$total_ips${NC} IPs saved to ${YELLOW}${nmap}ips.txt${NC}"
-
-    if [ "$total_ips" -gt 0 ]; then
-        echo -e "${BLUE}[i]${NC} Quick passive scan for hosts with nmap."
-
-        while IFS= read -r ip; do
-            if [[ -n "$ip" ]]; then
-                nmap -oN "${nmap_hosts}/${ip}.txt" "$ip" --excludefile "$out_of_scope"
-            fi
-        done < "${nmap}ips.txt"
-    fi
-
-    total_hosts=$(ls -1 "$nmap_hosts" | wc -l)
-    echo -e "${GREEN}[+]${NC} ${YELLOW}$total_hosts${NC} Hosts are up."
-}
-
-generate_html_quickhost_up() {
-	echo "<!DOCTYPE html><html>" > "$output_html_hosts_up"
-	echo "<head><title>Quick host up check report for $target</title>${CSS}</head>" >> "$output_html_hosts_up"
-	echo "<body>" >> "$output_html_hosts_up"
-	echo "<h1>Quick host up check report for $target</h1>" >> "$output_html_hosts_up"
-	
-	count=0
-
-	for file_path in "$nmap_hosts"*.txt; do
-	    ((count++))
-	    subdomain=$(grep -m 1 "Nmap scan report for" "$file_path" | awk '{print $5}')
-	    ip_address=$(grep -m 1 "Nmap scan report for" "$file_path" | awk -F '[()]' '{print $2}')
-
-	    ports=$(grep -E "^[0-9]+/tcp" "$file_path")
-
-	    if [[ -n "$ports" ]]; then
-            echo "<h2>$count) $subdomain ($ip_address)</h2>" >> "$output_html_hosts_up"
-            echo "<table border='1'>" >> "$output_html_hosts_up"
-            echo "<tr><th>Port</th><th>State</th><th>Service</th></tr>" >> "$output_html_hosts_up"
-
-            echo "$ports" | awk '{
-                color = ($2 == "open") ? "green" : "red";
-                print "<tr><td>"$1"</td><td><span style=\"color:" color "\">" $2 "</span></td><td>" $3 " " $4 " " $5 " " $6 "</td></tr>"
-            }' >> "$output_html_hosts_up"
-
-            echo "</table><br>" >> "$output_html_hosts_up"
-	    fi
-	done
-
-	echo "</body></html>" >> "$output_html_hosts_up"
-	echo -e "${GREEN}[+]${NC} Nmap scan report with ${YELLOW}$count${NC} subdomains generated under ${YELLOW}$output_html_hosts_up${NC}"
-}
-
 remove_directories() {
     local directory=$1
 
@@ -800,7 +878,7 @@ display_banner() {
     echo "                     Version $VERSION"
     echo "          Created by SirOcram aka 0xFF00FF"
     echo -e "       For domain: ${YELLOW}$target${NC}"
-    echo -e "${GREEN}  Header: $HEADER"
+    echo -e "${GREEN}  User-Agent: $USERAGENT"
     echo ""
 }
 
@@ -891,6 +969,7 @@ while true; do
                 echo "8. Get open ports (nmap)"
                 echo "9. Generate report of open ports"
                 echo "10. Check for downloads"
+                echo "11. Generate preview of downloads"
                 echo "x. Back to Main Menu"
                 read -p "Select an option: " reporting_option
 
@@ -905,6 +984,7 @@ while true; do
                     8) get_open_ports ;;
                     9) generate_html_open_ports ;;
                     10) check_for_downloads ;;
+                    11) generate_preview_of_downloads ;;
                     x) break ;;
                     *) echo -e "${RED}[!]${NC} Invalid option." ;;
                 esac
@@ -929,7 +1009,7 @@ while true; do
                 case $cleanup_option in
                     1) 
                         remove_directories $target_domains
-                        remove_directories $download_files
+                        remove_directories $downloads
                         remove_directories $nmap
                         remove_directories $screenshots
                         remove_directories $security
@@ -937,7 +1017,7 @@ while true; do
                         remove_directories $waybackurls_files
                         ;;
                     2) remove_directories $target_domains ;;
-                    3) remove_directories $download_files ;;
+                    3) remove_directories $downloads ;;
                     4) remove_directories $nmap ;;
                     5) remove_directories $screenshots ;;
                     6) remove_directories $security ;;
