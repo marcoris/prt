@@ -1,3 +1,3 @@
 {
-	"user-agent":"X-<CUSTOMER>-BUGBOUNTY: <USERNAME> - <YOUR USER AGENT>"
+	"user-agent":"<YOUR USER AGENT> - X-<CUSTOMER>-BUGBOUNTY: <USERNAME>"
 }
