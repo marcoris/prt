@@ -655,14 +655,14 @@ generate_html_screenshots() {
 	echo "<head><title>Screenshots from $target</title>" >> "$output_html_screenshots"
     echo "$CSS</head>" >> "$output_html_screenshots"
 	echo "<body>" >> "$output_html_screenshots"
-	echo "<h1>Screenshots from $target</h1><div class='flex'>" >> "$output_html_screenshots"
+	echo "<h1>Screenshots from $target</h1><div class='grid-container'>" >> "$output_html_screenshots"
 	
 	count=0
 
 	for img in "${screenshots}"*.jpeg; do
 	    if [[ -f "$img" ]]; then
             ((count++))
-            echo "<a href='${img##*/}' target='_blank'><img src='${img##*/}'></a>" >> "$output_html_screenshots"
+            echo "<div class='grid-item'><a href='${img##*/}' target='_blank'><img src='${img##*/}'></a></div>" >> "$output_html_screenshots"
         fi
 	done
 
