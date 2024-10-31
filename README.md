@@ -83,6 +83,4 @@ x. Back to Main Menu
 ![image](https://github.com/user-attachments/assets/231f0a26-f7e2-43fe-ab1e-19be2f200ff7)
 
 ## Workflow
-![image](https://github.com/user-attachments/assets/2cae0dbb-ca35-4e21-b9ad-5a5e4af4e4b0)
-
-
+![PentesterReconTool drawio (2)](https://github.com/user-attachments/assets/e485f475-de91-4f38-adb0-3e2a072e35eb)
