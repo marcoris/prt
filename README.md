@@ -29,6 +29,9 @@ x. Back to Main Menu
 1. Handle redirects
 2. Check scopes
 3. Check for live domains (httprobe)
+4. Get URL parameters for dalfox (paramspider)
+5. Get API version
+6. Get API response
 x. Back to Main Menu
 ```
 ### Security Tests
