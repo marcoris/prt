@@ -84,3 +84,10 @@ x. Back to Main Menu
 
 ## Workflow
 ![PentesterReconTool drawio](https://github.com/user-attachments/assets/6e625999-1331-4d0d-950a-22f25b238d87)
+
+### ToDos
+- [x] Subdomain Enumeration
+    - [x] Get all subdomains (assetfinder, subfinder, sublist3r)
+    - [x] Get theHarvester entries
+    - [x] Get WaybackURLs
+- [ ] Check for prototype pollution
