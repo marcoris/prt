@@ -29,6 +29,7 @@ tools=(
     httprobe
     jq
     nmap
+    paramspider
     sublist3r
     subfinder
     theHarvester
@@ -54,9 +55,21 @@ for cmd in $tools; do
     fi
 done
 
+rotate_user_agent() {
+    if [[ "${ROTATE_USER_AGENTS,,}" == "true" ]]; then
+        echo "${USERAGENTS[$RANDOM % ${#USERAGENTS[@]}]}"
+    else
+        echo $USERAGENT
+    fi
+}
+
+if [[ "${ROTATE_USER_AGENTS,,}" == "true" ]]; then
+    USERAGENT=$(rotate_user_agent)
+fi
+
 # Domain/file arguments
 target="$1"
-target_domains="../${WEBAPP_DIR}/${target}/domains/"
+target_domains="../${BUGBOUNTY_DIR}/${target}/domains/"
 target_sub_domains="${target_domains}sub_domains.txt"
 target_live_domains="${target_domains}live_domains.txt"
 target_redirect_domains="${target_domains}redirect_domains.txt"
@@ -64,20 +77,24 @@ target_redirect_for_scope_domains="${target_domains}redirect_for_scope_domains.t
 in_scope_results="${target_domains}in_scope_subdomains.txt"
 out_of_scope_results="${target_domains}out_of_scope_subdomains.txt"
 no_data_results="${target_domains}no_data_subdomains.txt"
+parameter_results="${target_domains}sub_domain_parameters.txt"
 
 # Directory/file arguments
-the_harvester_files="../${WEBAPP_DIR}/$target/theharvester/"
+the_harvester_files="../${BUGBOUNTY_DIR}/$target/theharvester/"
 target_theharvester="${the_harvester_files}theHarvester.json"
-downloads="../${WEBAPP_DIR}/$target/downloads/"
-waybackurls_files="../${WEBAPP_DIR}/$target/waybackurls/"
-screenshots="../${WEBAPP_DIR}/$target/screenshots/"
-security="../${WEBAPP_DIR}/$target/security/"
+downloads="../${BUGBOUNTY_DIR}/$target/downloads/"
+waybackurls_files="../${BUGBOUNTY_DIR}/$target/waybackurls/"
+screenshots="../${BUGBOUNTY_DIR}/$target/screenshots/"
+api_files="../${BUGBOUNTY_DIR}/$target/api/"
+api_versions="${api_files}versions/"
+api_responses="${api_files}responses/"
+security="../${BUGBOUNTY_DIR}/$target/security/"
 xss_files="${security}xss/"
 csp_files="${security}csp/"
 xss_vulns="${xss_files}vulnerabilities.txt"
 csp_has_file="${csp_files}has/"
 csp_no_file="${csp_files}no/"
-nmap="../${WEBAPP_DIR}/$target/nmap/"
+nmap="../${BUGBOUNTY_DIR}/$target/nmap/"
 nmap_ports="${nmap}ports/"
 nmap_hosts="${nmap}hosts/"
 
@@ -92,8 +109,8 @@ output_html_xss="${security}xss-report.html"
 CSS="<link rel='stylesheet' href='../../../prt/style.css'>"
 
 # Scope files
-in_scope="../${WEBAPP_DIR}/$target/in_scope.txt"
-out_of_scope="../${WEBAPP_DIR}/$target/out_of_scope.txt"
+in_scope="../${BUGBOUNTY_DIR}/$target/in_scope.txt"
+out_of_scope="../${BUGBOUNTY_DIR}/$target/out_of_scope.txt"
 
 # Make directories
 mkdir -p $target_domains
@@ -101,6 +118,8 @@ mkdir -p $the_harvester_files
 mkdir -p $downloads
 mkdir -p $waybackurls_files
 mkdir -p $screenshots
+mkdir -p $api_versions
+mkdir -p $api_responses
 mkdir -p $nmap_ports
 mkdir -p $nmap_hosts
 mkdir -p $csp_has_file
@@ -316,7 +335,7 @@ binary_search() {
 
 check_for_downloads() {
     if [ ! -n "$get_last_years" ]; then
-        echo -e "${YELLOW}[?]${NC} The variable 'get_last_years' is not set. Enter the number of years back for the waybackurls file: "
+        echo -e "${YELLOW}[?]${NC} The variable ${YELLOW}get_last_years${NC} is not set. Enter the number of years back for the waybackurls file: "
         read -r get_last_years
     fi
 
@@ -330,7 +349,7 @@ check_for_downloads() {
             echo -e "${GREEN}[+]${NC} File $file_name found and will be used."
             break
         else
-            echo -e "${RED}[!]${NC} File $file_name after $max_attempts attempts not found. Returning to menu entry 1.3 waybackurls."
+            echo -e "${RED}[!]${NC} File ${YELLOW}$file_name${NC} not found. If file after $max_attempts attempts is not found, return to menu entry 1.3 waybackurls."
             ((attempts++))
 
             if (( attempts < max_attempts )); then
@@ -357,6 +376,7 @@ check_for_downloads() {
                 domain=$(echo "$url" | sed -E 's|https?://([^/]+)/.*|\1|')
                 mkdir -p "${downloads}${domain}/${filepath}"
                 echo -e "${FUCHSIA}[*]${NC} Downloading ${YELLOW}$url${NC}"
+                USERAGENT=$(rotate_user_agent)
                 curl -sS --connect-timeout 10 -H "User-Agent: $USERAGENT" -o "${downloads}${domain}/${filepath}/$filename" "$url"
 
                 ((download_count++))
@@ -369,7 +389,7 @@ check_for_downloads() {
         fi
     done < "${waybackurls_files}waybackurls_last_${get_last_years}_years.txt"
 
-    total_download_dirs=$(ls -1 "$downloads" | wc -l)
+    total_download_dirs=$(ls -1 "${downloads}${domain}" | wc -l)
     total_downloaded_files=$(find "$downloads" -type f | wc -l)
     echo -e "${GREEN}[+]${NC} ${YELLOW}$total_downloaded_files${NC} files were downloaded in ${YELLOW}$total_download_dirs${NC} directories to ${YELLOW}$downloads${NC}"
 }
@@ -388,6 +408,7 @@ is_extension_allowed() {
 
 is_downloadable() {
     local url=$1
+    USERAGENT=$(rotate_user_agent)
     local content_type=$(curl -H "User-Agent: $USERAGENT" -sI "$url" | grep -i "Content-Type:" | cut -d' ' -f2 | tr -d '\r')
 
     if [ -n "$content_type" ]; then
@@ -401,6 +422,7 @@ is_downloadable() {
     return 1
 }
 
+# HAVE TO HANDLE THE BIG AMOUNT OF IMAGES => CREATE THUMBNAILS
 generate_preview_of_downloads() {
     start=$(date +%s)
     echo "<!DOCTYPE html>
@@ -509,10 +531,13 @@ check_xss() {
     > $xss_vulns
     
     start=$(date +%s)
+    USERAGENT=$(rotate_user_agent)
     cat "$target_live_domains" | dalfox pipe --user-agent "$USERAGENT" --delay "$DELAY" --output $xss_vulns --remote-payloads "$payloads"
     end=$(date +%s)
 
-    echo -e "${BLUE}[i]${NC} Took ${YELLOW}$(($end-$start)) seconds${NC} to scan for XSS vulns which are saved in ${YELLOW}$xss_vulns${NC}"
+    total_xss=$(wc -l < "$xss_vulns")
+
+    echo -e "${BLUE}[i]${NC} Took ${YELLOW}$(($end-$start)) seconds${NC} to scan for XSS vulns. ${YELLOW}$total_xss${NC} XSS vulnerabilities are saved in ${YELLOW}$xss_vulns${NC}"
 }
 
 generate_html_xss() {
@@ -575,7 +600,7 @@ handle_redirects() {
     if [[ $total_domains -gt 0 ]]; then
 	    while read -r url; do
             ((count++))
-            
+            USERAGENT=$(rotate_user_agent)
             final_url=$(curl -H "User-Agent: $USERAGENT" --connect-timeout 10 -s -o /dev/null -w "%{url_effective}" -k -L "$url")
             # Remove the :443 port if it exists
             final_url=$(echo "$final_url" | sed 's/:443//')
@@ -608,7 +633,96 @@ handle_redirects() {
     echo -e "${GREEN}[+]${NC} ${YELLOW}$total_redirect_domains_for_scope${NC} redirected subdomains saved to to check in scope in ${YELLOW}$target_redirect_for_scope_domains${NC}"
 }
 
+get_parameters() {
+    echo -e "${BLUE}[i]${NC} Passive scan..."
+    echo -e "${FUCHSIA}[*]${NC} Getting parameters of ${YELLOW}$target${NC}"
+    start=$(date +%s)
+    paramspider -l "$in_scope_results"
+    end=$(date +%s)
+
+    echo -e "${GREEN}[+]${NC} Took ${YELLOW}$((end-start)) seconds${NC} to get parameters."
+    echo -e "${FUCHSIA}[*]${NC} Saving URLs to ${YELLOW}$parameter_results${NC} and cleaning up..."
+    cat results/*.txt > "$parameter_results"
+    sort -u "$parameter_results" -o "$parameter_results"
+    rm -rf results
+
+    total_parameters=$(wc -l < "$parameter_results")
+    echo -e "${GREEN}[+]${NC} There are ${YELLOW}$total_parameters${NC} URL with parameters saved."
+}
+
+get_api_version() {
+    if [ -f "${waybackurls_files}api.txt" ]; then
+        total_apis=$(wc -l < "${waybackurls_files}api.txt")
+        echo -e "${FUCHSIA}[*]${NC} Getting API versions from ${YELLOW}$total_apis${NC} URLs..."
+        start=$(date +%s)
+        while read -r url; do
+            version=$(echo "$url" | grep -oE "/v[0-9]+/" | tr -d '/')
+            if [[ -n "$version" ]]; then
+                echo "$url" >> "${api_versions}api_version_${version}.txt"
+            fi
+        done < "${waybackurls_files}api.txt"
+        end=$(date +%s)
+
+        total_versions=$(ls -1 "$api_versions" | wc -l)
+        echo -e "${GREEN}[+]${NC} Took ${YELLOW}$((end-start)) seconds${NC} to save ${YELLOW}$total_versions${NC} versions."
+    else
+        echo -e "${RED}[!]${NC} There is no api.txt in ${YELLOW}$waybackurls_files${NC}"
+    fi
+}
+
+get_api_response() {
+    total_apis=$(cat "$api_versions"*.txt | wc -l)
+    echo -e "${RED}[i]${NC} Active scan..."
+    echo -e "${FUCHSIA}[*]${NC} Getting response from ${YELLOW}$total_apis API requests${NC}..."
+    
+    api_count=0
+    start=$(date +%s)
+    for version_file in "$api_versions"*.txt; do
+        version=$(basename "$version_file" .txt)
+        version_short=$(echo $version | sed 's/^api_version_//')
+        echo -e "${BLUE}[i]${NC} Reading contents from file ${YELLOW}$version_file${NC}"
+
+        while read -r url; do
+            ((total_apis--))
+            echo -e "${FUCHSIA}[*]${NC} Checking ${YELLOW}$url${NC}"
+            USERAGENT=$(rotate_user_agent)
+            response=$(curl -H "User-Agent: $USERAGENT" --connect-timeout 10 -sS -i "$url")
+            content_type=$(echo "$response" | grep -i "Content-Type:" | cut -d' ' -f2 | tr -d '\r')
+            
+            if [[ "$content_type" == "application/json" ]]; then
+                body=$(echo "$response" | tail -n 1)
+                echo "$body" | jq empty > /dev/null 2>&1
+                if [[ $? -eq 0 ]]; then
+                    ((api_count++))
+                    if (( api_count % 10 == 0 )); then
+                        echo -e "${GREEN}[+]${NC} ${YELLOW}$api_count JSON files${NC} downloaded so far. Still ${YELLOW}$total_apis${NC} to check..."
+                    fi
+
+                    if [ ! -d "${api_responses}$version_short" ]; then
+                        mkdir -p "${api_responses}$version_short"
+                    fi
+                    filename=$(echo "$url" | sed 's|https://||; s|/|_|g')
+                    echo "$body" > "${api_responses}${version_short}/${filename}.json"
+                else
+                    echo -e "${RED}[!]${NC} No BODY!"
+                fi
+            else
+                echo -e "${RED}[!]${NC} Not a JSON response! It was $content_type."
+            fi
+            sleep $(awk "BEGIN {printf \"%.2f\", $DELAY/1000}")
+        done < "${version_file}"
+    done
+    end=$(date +%s)
+    echo -e "${GREEN}[+]${NC} Took ${YELLOW}$((end-start)) seconds${NC} to get API responses."
+}
+
+# Check for prototype pollution
+check_prototype_pollution() {
+    echo "checking for prototype pollution..."
+}
+
 import_in_burp() {
+    USERAGENT=$(rotate_user_agent)
     if ! curl -s -H "User-Agent: $USERAGENT" --request GET "$PROXY_HOST" | grep "200 OK" > /dev/null; then
         echo -e "${RED}[!]${NC} Warning: Burp Suite proxy at $PROXY_HOST is not reachable."
         return 1
@@ -622,6 +736,7 @@ import_in_burp() {
 
     for live_domain in $(cat "$target_live_domains"); do
         ((count++))
+        USERAGENT=$(rotate_user_agent)
         echo -e "${YELLOW}[+]${NC} Sending domain $count/$total_live_domains: $live_domain"
         curl -s -H "User-Agent: $USERAGENT" -x "$PROXY_HOST" -k "$live_domain" > /dev/null
 
@@ -699,7 +814,8 @@ quick_host_up_check() {
 
         while IFS= read -r ip; do
             if [[ -n "$ip" ]]; then
-                nmap -Pn -oN "${nmap_hosts}/${ip}.txt" "$ip" --script-args http.useragent="$USERAGENT"
+                USERAGENT=$(rotate_user_agent)
+                nmap -Pn -oN "${nmap_hosts}/${ip}.txt" "$ip" --script-args http.useragent="${USERAGENT}"
             fi
         done < "${nmap}ips.txt"
     fi
@@ -742,13 +858,14 @@ generate_html_quickhost_up() {
 }
 
 get_open_ports() {
-    total_ips=$(cat "${nmap}ips.txt" | wc -l)
+    total_ips=$(wc -l < "${nmap}ips.txt")
     echo -e "${RED}[!]${NC} Active scan of ${YELLOW}$total_ips${NC} IPs for status with nmap..."
     
     start=$(date +%s)
 
     while read -r ip; do
-        nmap -sV -oN "${nmap_ports}${ip}.txt" "$ip" -T3 --script-args http.useragent="$USERAGENT"
+        USERAGENT=$(rotate_user_agent)
+        sudo nmap -p- -sV -oN "${nmap_ports}${ip}.txt" "$ip" -T3 --script-args http.useragent="${USERAGENT}"
     done < "${nmap}ips.txt"
 
     end=$(date +%s)
@@ -781,7 +898,7 @@ generate_html_open_ports() {
 
             echo "$ports" | awk '{
                 color = ($2 == "open") ? "green" : "red";
-                print "<tr><td>"$1"</td><td>"$2"</td><td>"$3"</td><td>"$4" "$5" "$6" "$7" "$8" "$9" "$10"</td></tr>"
+                print "<tr><td>"$1"</td><td><span style=\"color:" color "\">"$2"</span></td><td>"$3"</td><td>"$4" "$5" "$6" "$7" "$8" "$9" "$10"</td></tr>"
             }' >> "$output_html_open_ports"
             echo "</table><br>" >> "$output_html_open_ports"
             echo "${os_details}<br>" >> "$output_html_open_ports"
@@ -814,6 +931,7 @@ check_csp() {
 
         safe_target=$(echo $target_live | tr -s '[:punct:]' '_' | tr ' ' '_')
 
+        USERAGENT=$(rotate_user_agent)
         has_csp=$(curl -H "User-Agent: $USERAGENT" --connect-timeout 10 -s -D - $target_live | grep -i "content-security-policy")
         
         if [[ -n "$has_csp" ]]; then
@@ -884,7 +1002,7 @@ display_banner() {
     echo "                     Version $VERSION"
     echo "          Created by SirOcram aka 0xFF00FF"
     echo -e "       For domain: ${YELLOW}$target${NC}"
-    echo -e "${GREEN}User-Agent: $USERAGENT${NC}"
+    echo -e "${FUCHSIA}Bugbounty header:${NC} ${YELLOW}$BUGBOUNTY${NC}"
     echo ""
 }
 
@@ -930,6 +1048,9 @@ while true; do
                 echo -e "${FUCHSIA}1.${NC} Handle redirects"
                 echo -e "${FUCHSIA}2.${NC} Check scopes"
                 echo -e "${FUCHSIA}3.${NC} Check for live domains (httprobe)"
+                echo -e "${FUCHSIA}4.${NC} Get URL parameters for dalfox (paramspider)"
+                echo -e "${FUCHSIA}5.${NC} Get API version"
+                echo -e "${FUCHSIA}6.${NC} Get API response"
                 echo -e "${FUCHSIA}x.${NC} Back to Main Menu"
                 read -p "Select an option: " domain_option
 
@@ -937,6 +1058,9 @@ while true; do
                     1) handle_redirects ;;
                     2) check_scopes ;;
                     3) check_live_domains ;;
+                    4) get_parameters ;;
+                    5) get_api_version ;;
+                    6) get_api_response ;;
                     x) break ;;
                     *) echo -e "${RED}[!]${NC} Invalid option." ;;
                 esac
