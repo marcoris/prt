@@ -67,6 +67,24 @@ if [[ "${ROTATE_USER_AGENTS,,}" == "true" ]]; then
     USERAGENT=$(rotate_user_agent)
 fi
 
+format_time() {
+    local seconds=$1
+    local days=$((seconds / 86400))
+    local hours=$(( (seconds % 86400) / 3600 ))
+    local minutes=$(( (seconds % 3600) / 60 ))
+    local secs=$((seconds % 60))
+
+    if (( seconds < 60 )); then
+        echo -e "Took ${YELLOW} $secs seconds${NC}"
+    elif (( seconds < 3600 )); then
+        echo "${minutes} minutes ${secs} seconds"
+    elif (( seconds < 86400 )); then
+        echo "${hours} hours ${minutes} minutes ${secs} seconds"
+    else
+        echo "${days} days ${hours} hours ${minutes} minutes ${secs} seconds"
+    fi
+}
+
 # Domain/file arguments
 target="$1"
 target_domains="../${BUGBOUNTY_DIR}/${target}/domains/"
@@ -164,8 +182,11 @@ get_theharvester_data() {
 	subdomain_count=$(jq -r '.hosts[] | select(. != null)' theharvester.json | wc -l)
     interesting_urls_count=$(jq -r '.interesting_urls[] | select(. != null)' theharvester.json | wc -l)
     ip_count=$(jq -r '.ips[] | select(. != null)' theharvester.json | wc -l)
+
+    elapsed=$((end - start))
+    formatted_time=$(format_time "$elapsed")
     
-    echo -e "${BLUE}[i]${NC} Took ${YELLOW}$(($end-$start)) seconds${NC} to fetch theharvester data."
+    echo -e "${BLUE}[i]${NC} Took ${YELLOW}$formatted_time${NC} to fetch theharvester data."
     echo -e "${GREEN}[+]${NC} ${YELLOW}$email_count${NC} E-Mails fetched."
 	echo -e "${GREEN}[+]${NC} ${YELLOW}$subdomain_count${NC} Subdomains fetched."
     echo -e "${GREEN}[+]${NC} ${YELLOW}$interesting_urls_count${NC} Interesting URLs fetched."
@@ -256,8 +277,11 @@ get_wayback_urls() {
 	total_domains=$(wc -l < "${waybackurls_files}waybackurls_raw.txt")
     start_date=$(head -1 "${waybackurls_files}waybackurls_raw.txt" | awk '{print $1}')
     end_date=$(tail -1 "${waybackurls_files}waybackurls_raw.txt"| awk '{print $1}')
+
+    elapsed=$((end - start))
+    formatted_time=$(format_time "$elapsed")
 	
-    echo -e "${BLUE}[i]${NC} Took ${YELLOW}$(($end-$start)) seconds${NC} to fetch ${YELLOW}$total_domains domains${NC} which are saved in ${YELLOW}${waybackurls_files}waybackurls_raw.txt${NC}"
+    echo -e "${BLUE}[i]${NC} Took ${YELLOW}$formatted_time${NC} to fetch ${YELLOW}$total_domains domains${NC} which are saved in ${YELLOW}${waybackurls_files}waybackurls_raw.txt${NC}"
 	echo -e "${BLUE}[i]${NC} From starting date ${YELLOW}$start_date${NC} till end date ${YELLOW}$end_date${NC}"
     echo -e "${FUCHSIA}[*]${NC} Saving data since ${YELLOW}$get_last_years${NC} years ago..."
 
@@ -460,8 +484,11 @@ generate_preview_of_downloads() {
         </body>
         </html>" >> "$output_html_downloads"
     end=$(date +%s)
+
+    elapsed=$((end - start))
+    formatted_time=$(format_time "$elapsed")
     
-   	echo -e "${GREEN}[+]${NC} Took ${YELLOW}$((end-start)) seconds${NC} for HTML output for preview of the downloads is generated under: ${YELLOW}$output_html_downloads${NC}"
+   	echo -e "${GREEN}[+]${NC} $formatted_time for generating output for preview of the downloads in: ${YELLOW}$output_html_downloads${NC}"
 }
 
 check_scopes() {   
@@ -537,7 +564,10 @@ check_xss() {
 
     total_xss=$(wc -l < "$xss_vulns")
 
-    echo -e "${BLUE}[i]${NC} Took ${YELLOW}$(($end-$start)) seconds${NC} to scan for XSS vulns. ${YELLOW}$total_xss${NC} XSS vulnerabilities are saved in ${YELLOW}$xss_vulns${NC}"
+    elapsed=$((end - start))
+    formatted_time=$(format_time "$elapsed")
+
+    echo -e "${BLUE}[i]${NC} Took ${YELLOW}$formatted_time${NC} to scan for XSS vulns. ${YELLOW}$total_xss${NC} XSS vulnerabilities are saved in ${YELLOW}$xss_vulns${NC}"
 }
 
 generate_html_xss() {
@@ -640,7 +670,10 @@ get_parameters() {
     paramspider -l "$in_scope_results"
     end=$(date +%s)
 
-    echo -e "${GREEN}[+]${NC} Took ${YELLOW}$((end-start)) seconds${NC} to get parameters."
+    elapsed=$((end - start))
+    formatted_time=$(format_time "$elapsed")
+
+    echo -e "${GREEN}[+]${NC} Took ${YELLOW}$formatted_time${NC} to get parameters."
     echo -e "${FUCHSIA}[*]${NC} Saving URLs to ${YELLOW}$parameter_results${NC} and cleaning up..."
     cat results/*.txt > "$parameter_results"
     sort -u "$parameter_results" -o "$parameter_results"
@@ -651,6 +684,11 @@ get_parameters() {
 }
 
 get_api_version() {
+    if [ ! -d $api_versions ]; then
+        echo -e "${FUCHSIA}[*]${NC} making missing directory under: ${api_versions}."
+        mkdir -p $api_versions
+    fi
+
     if [ -f "${waybackurls_files}api.txt" ]; then
         total_apis=$(wc -l < "${waybackurls_files}api.txt")
         echo -e "${FUCHSIA}[*]${NC} Getting API versions from ${YELLOW}$total_apis${NC} URLs..."
@@ -664,18 +702,28 @@ get_api_version() {
         end=$(date +%s)
 
         total_versions=$(ls -1 "$api_versions" | wc -l)
-        echo -e "${GREEN}[+]${NC} Took ${YELLOW}$((end-start)) seconds${NC} to save ${YELLOW}$total_versions${NC} versions."
+
+        elapsed=$((end - start))
+        formatted_time=$(format_time "$elapsed")
+
+        echo -e "${GREEN}[+]${NC} Took ${YELLOW}$formatted_time${NC} to save ${YELLOW}$total_versions${NC} versions."
     else
         echo -e "${RED}[!]${NC} There is no api.txt in ${YELLOW}$waybackurls_files${NC}"
     fi
 }
 
 get_api_response() {
+    if [ ! -d $api_responses ]; then
+        echo -e "${FUCHSIA}[*]${NC} making missing directory under: ${api_responses}."
+        mkdir -p $api_responses
+    fi
+
     total_apis=$(cat "$api_versions"*.txt | wc -l)
     echo -e "${RED}[i]${NC} Active scan..."
     echo -e "${FUCHSIA}[*]${NC} Getting response from ${YELLOW}$total_apis API requests${NC}..."
     
     api_count=0
+    api_scans=0
     start=$(date +%s)
     for version_file in "$api_versions"*.txt; do
         version=$(basename "$version_file" .txt)
@@ -684,6 +732,7 @@ get_api_response() {
 
         while read -r url; do
             ((total_apis--))
+            ((api_scans++))
             echo -e "${FUCHSIA}[*]${NC} Checking ${YELLOW}$url${NC}"
             USERAGENT=$(rotate_user_agent)
             response=$(curl -H "User-Agent: $USERAGENT" --connect-timeout 10 -sS -i "$url")
@@ -694,9 +743,6 @@ get_api_response() {
                 echo "$body" | jq empty > /dev/null 2>&1
                 if [[ $? -eq 0 ]]; then
                     ((api_count++))
-                    if (( api_count % 10 == 0 )); then
-                        echo -e "${GREEN}[+]${NC} ${YELLOW}$api_count JSON files${NC} downloaded so far. Still ${YELLOW}$total_apis${NC} to check..."
-                    fi
 
                     if [ ! -d "${api_responses}$version_short" ]; then
                         mkdir -p "${api_responses}$version_short"
@@ -709,11 +755,24 @@ get_api_response() {
             else
                 echo -e "${RED}[!]${NC} Not a JSON response! It was $content_type."
             fi
+
+            if (( api_scans % 10 == 0 )); then
+                echo -e "${GREEN}[+]${NC} Scanned ${GREEN}$api_scans${NC} URLs ${GREEN}$api_count JSON files${NC} downloaded so far. Still ${GREEN}$total_apis${NC} to check..."
+            fi
+
             sleep $(awk "BEGIN {printf \"%.2f\", $DELAY/1000}")
         done < "${version_file}"
     done
     end=$(date +%s)
-    echo -e "${GREEN}[+]${NC} Took ${YELLOW}$((end-start)) seconds${NC} to get API responses."
+
+    elapsed=$((end - start))
+    formatted_time=$(format_time "$elapsed")
+
+    echo -e "${GREEN}[+]${NC} Took ${YELLOW}$formatted_time${NC} to download API responses."
+}
+
+remove_api_responses_by_bytes() {
+    echo "Remove by bytes <= 250 delete"
 }
 
 # Check for prototype pollution
@@ -762,7 +821,11 @@ take_screenshots() {
     end=$(date +%s)
 
     total_files=$(ls -1 "$screenshots" | wc -l)
-    echo -e "${BLUE}[i]${NC} Took ${YELLOW}$(($end-$start)) seconds${NC} to shoot ${YELLOW}$total_files${NC} screenshots."
+
+    elapsed=$((end - start))
+    formatted_time=$(format_time "$elapsed")
+
+    echo -e "${BLUE}[i]${NC} Took ${YELLOW}$formatted_time${NC} to shoot ${YELLOW}$total_files${NC} screenshots."
 }
 
 generate_html_screenshots() {
@@ -870,9 +933,10 @@ get_open_ports() {
 
     end=$(date +%s)
 
-    diff=$(($end-$start))
-    minutes=$((diff / 60))
-    echo -e "${GREEN}[+]${NC} Took ${YELLOW}$minutes minutes${NC} to scan $total_ips IPs with nmap."
+    elapsed=$((end - start))
+    formatted_time=$(format_time "$elapsed")
+
+    echo -e "${GREEN}[+]${NC} Took ${YELLOW}$formatted_time${NC} to scan $total_ips IPs with nmap."
 }
 
 generate_html_open_ports() {
@@ -1073,12 +1137,14 @@ while true; do
                 echo -e "${FUCHSIA}================== Security Tests ==================${NC}"
                 echo -e "${FUCHSIA}1.${NC} Check CSP"
                 echo -e "${FUCHSIA}2.${NC} Check XSS with Dalfox"
+                echo -e "${FUCHSIA}3.${NC} Check for prototype pollution"
                 echo -e "${FUCHSIA}x.${NC} Back to Main Menu"
                 read -p "Select an option: " security_option
 
                 case $security_option in
                     1) check_csp ;;
                     2) check_xss ;;
+                    3) check_prototype_pollution ;;
                     x) break ;;
                     *) echo -e "${RED}[!]${NC} Invalid option." ;;
                 esac
@@ -1133,6 +1199,7 @@ while true; do
                 echo -e "${FUCHSIA}6.${NC} Cleanup security"
                 echo -e "${FUCHSIA}7.${NC} Cleanup theHarvester"
                 echo -e "${FUCHSIA}8.${NC} Cleanup waybackURLs"
+                echo -e "${FUCHSIA}9.${NC} Cleanup APIs"
                 echo -e "${FUCHSIA}x.${NC} Back to Main Menu"
                 read -p "Select an option: " cleanup_option
 
@@ -1145,6 +1212,7 @@ while true; do
                         remove_directories $security
                         remove_directories $the_harvester_files
                         remove_directories $waybackurls_files
+                        remove_directories $api_files
                         ;;
                     2) remove_directories $target_domains ;;
                     3) remove_directories $downloads ;;
@@ -1153,6 +1221,7 @@ while true; do
                     6) remove_directories $security ;;
                     7) remove_directories $the_harvester_files ;;
                     8) remove_directories $waybackurls_files ;;
+                    9) remove_directories $api_files ;;
                     x) break ;;
                     *) echo -e "${RED}[!]${NC} Invalid option." ;;
                 esac
