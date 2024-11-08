@@ -1066,7 +1066,7 @@ display_banner() {
     echo "                     Version $VERSION"
     echo "          Created by SirOcram aka 0xFF00FF"
     echo -e "       For domain: ${YELLOW}$target${NC}"
-    echo -e "${FUCHSIA}Bugbounty header:${NC} ${YELLOW}$BUGBOUNTY${NC}"
+    echo -e "${FUCHSIA}Bugbounty header:${NC} ${YELLOW}$BUGBOUNTY_USER${NC}"
     echo ""
 }
 
