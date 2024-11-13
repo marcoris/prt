@@ -21,6 +21,9 @@ x. Exit
 1. Get all subdomains (assetfinder, subfinder)
 2. Get theHarvester entries
 3. Get WaybackURLs
+4. Get API versions
+5. Get API response
+6. Remove small API responses
 x. Back to Main Menu
 ```
 ### Domain Check and Scope Handling
@@ -29,16 +32,14 @@ x. Back to Main Menu
 1. Handle redirects
 2. Check scopes
 3. Check for live domains (httprobe)
-4. Get URL parameters for dalfox (paramspider)
-5. Get API version
-6. Get API response
 x. Back to Main Menu
 ```
 ### Security Tests
 ```
 ================== Security Tests ==================
 1. Check CSP
-2. Check XSS with Dalfox
+2. Check XSS with dalfox
+3. Check for vulnerabilities with nikto
 x. Back to Main Menu
 ```
 ### Reporting
