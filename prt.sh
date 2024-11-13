@@ -28,8 +28,8 @@ tools=(
     gowitness
     httprobe
     jq
+    nikto
     nmap
-    paramspider
     sublist3r
     subfinder
     theHarvester
@@ -75,13 +75,13 @@ format_time() {
     local secs=$((seconds % 60))
 
     if (( seconds < 60 )); then
-        echo -e "Took ${YELLOW} $secs seconds${NC}"
+        echo -e "Took ${YELLOW}${secs} seconds${NC}"
     elif (( seconds < 3600 )); then
-        echo "${minutes} minutes ${secs} seconds"
+        echo -e "Took ${YELLOW}${minutes} minutes and ${secs} seconds${NC}"
     elif (( seconds < 86400 )); then
-        echo "${hours} hours ${minutes} minutes ${secs} seconds"
+        echo -e "Took ${YELLOW}${hours} hours ${minutes} minutes and ${secs} seconds${NC}"
     else
-        echo "${days} days ${hours} hours ${minutes} minutes ${secs} seconds"
+        echo -e "Took ${YELLOW}${days} days ${hours} hours ${minutes} minutes and ${secs} seconds${NC}"
     fi
 }
 
@@ -106,10 +106,12 @@ screenshots="../${BUGBOUNTY_DIR}/$target/screenshots/"
 api_files="../${BUGBOUNTY_DIR}/$target/api/"
 api_versions="${api_files}versions/"
 api_responses="${api_files}responses/"
+small_api_responses="../${BUGBOUNTY_DIR}/$target/api/small_api_responses.txt"
 security="../${BUGBOUNTY_DIR}/$target/security/"
 xss_files="${security}xss/"
 csp_files="${security}csp/"
 xss_vulns="${xss_files}vulnerabilities.txt"
+custom_payloads="${security}xss/custom_payloads.txt"
 csp_has_file="${csp_files}has/"
 csp_no_file="${csp_files}no/"
 nmap="../${BUGBOUNTY_DIR}/$target/nmap/"
@@ -123,6 +125,7 @@ output_html_screenshots="${screenshots}screenshots.html"
 output_html_downloads="${downloads}downloads.html"
 output_html_csp="${security}csp-report.html"
 output_html_xss="${security}xss-report.html"
+output_html_nikto="${security}nikto-report.html"
 
 CSS="<link rel='stylesheet' href='../../../prt/style.css'>"
 
@@ -186,7 +189,7 @@ get_theharvester_data() {
     elapsed=$((end - start))
     formatted_time=$(format_time "$elapsed")
     
-    echo -e "${BLUE}[i]${NC} Took ${YELLOW}$formatted_time${NC} to fetch theharvester data."
+    echo -e "${BLUE}[i]${NC} ${YELLOW}$formatted_time${NC} to fetch theharvester data."
     echo -e "${GREEN}[+]${NC} ${YELLOW}$email_count${NC} E-Mails fetched."
 	echo -e "${GREEN}[+]${NC} ${YELLOW}$subdomain_count${NC} Subdomains fetched."
     echo -e "${GREEN}[+]${NC} ${YELLOW}$interesting_urls_count${NC} Interesting URLs fetched."
@@ -281,7 +284,7 @@ get_wayback_urls() {
     elapsed=$((end - start))
     formatted_time=$(format_time "$elapsed")
 	
-    echo -e "${BLUE}[i]${NC} Took ${YELLOW}$formatted_time${NC} to fetch ${YELLOW}$total_domains domains${NC} which are saved in ${YELLOW}${waybackurls_files}waybackurls_raw.txt${NC}"
+    echo -e "${BLUE}[i]${NC} ${YELLOW}$formatted_time${NC} to fetch ${YELLOW}$total_domains domains${NC} which are saved in ${YELLOW}${waybackurls_files}waybackurls_raw.txt${NC}"
 	echo -e "${BLUE}[i]${NC} From starting date ${YELLOW}$start_date${NC} till end date ${YELLOW}$end_date${NC}"
     echo -e "${FUCHSIA}[*]${NC} Saving data since ${YELLOW}$get_last_years${NC} years ago..."
 
@@ -559,7 +562,12 @@ check_xss() {
     
     start=$(date +%s)
     USERAGENT=$(rotate_user_agent)
-    cat "$target_live_domains" | dalfox pipe --user-agent "$USERAGENT" --delay "$DELAY" --output $xss_vulns --remote-payloads "$payloads"
+    if [ -f "$custom_payloads" ]; then
+        echo -e "${BLUE}[i]${NC} Using ${YELLOW}custom${NC} payloads."
+        cat "$target_live_domains" | dalfox pipe --user-agent "$USERAGENT" --delay "$DELAY" --output $xss_vulns --remote-payloads "$payloads" --custom-payload "$custom_payloads"
+    else
+        cat "$target_live_domains" | dalfox pipe --user-agent "$USERAGENT" --delay "$DELAY" --output $xss_vulns --remote-payloads "$payloads"
+    fi
     end=$(date +%s)
 
     total_xss=$(wc -l < "$xss_vulns")
@@ -567,7 +575,7 @@ check_xss() {
     elapsed=$((end - start))
     formatted_time=$(format_time "$elapsed")
 
-    echo -e "${BLUE}[i]${NC} Took ${YELLOW}$formatted_time${NC} to scan for XSS vulns. ${YELLOW}$total_xss${NC} XSS vulnerabilities are saved in ${YELLOW}$xss_vulns${NC}"
+    echo -e "${BLUE}[i]${NC} ${YELLOW}$formatted_time${NC} to scan for XSS vulns. ${YELLOW}$total_xss${NC} XSS vulnerabilities are saved in ${YELLOW}$xss_vulns${NC}"
 }
 
 generate_html_xss() {
@@ -663,27 +671,7 @@ handle_redirects() {
     echo -e "${GREEN}[+]${NC} ${YELLOW}$total_redirect_domains_for_scope${NC} redirected subdomains saved to to check in scope in ${YELLOW}$target_redirect_for_scope_domains${NC}"
 }
 
-get_parameters() {
-    echo -e "${BLUE}[i]${NC} Passive scan..."
-    echo -e "${FUCHSIA}[*]${NC} Getting parameters of ${YELLOW}$target${NC}"
-    start=$(date +%s)
-    paramspider -l "$in_scope_results"
-    end=$(date +%s)
-
-    elapsed=$((end - start))
-    formatted_time=$(format_time "$elapsed")
-
-    echo -e "${GREEN}[+]${NC} Took ${YELLOW}$formatted_time${NC} to get parameters."
-    echo -e "${FUCHSIA}[*]${NC} Saving URLs to ${YELLOW}$parameter_results${NC} and cleaning up..."
-    cat results/*.txt > "$parameter_results"
-    sort -u "$parameter_results" -o "$parameter_results"
-    rm -rf results
-
-    total_parameters=$(wc -l < "$parameter_results")
-    echo -e "${GREEN}[+]${NC} There are ${YELLOW}$total_parameters${NC} URL with parameters saved."
-}
-
-get_api_version() {
+get_api_versions() {
     if [ ! -d $api_versions ]; then
         echo -e "${FUCHSIA}[*]${NC} making missing directory under: ${api_versions}."
         mkdir -p $api_versions
@@ -696,7 +684,7 @@ get_api_version() {
         while read -r url; do
             version=$(echo "$url" | grep -oE "/v[0-9]+/" | tr -d '/')
             if [[ -n "$version" ]]; then
-                echo "$url" >> "${api_versions}api_version_${version}.txt"
+                echo "$url" >> "${api_versions}${version}.txt"
             fi
         done < "${waybackurls_files}api.txt"
         end=$(date +%s)
@@ -706,7 +694,7 @@ get_api_version() {
         elapsed=$((end - start))
         formatted_time=$(format_time "$elapsed")
 
-        echo -e "${GREEN}[+]${NC} Took ${YELLOW}$formatted_time${NC} to save ${YELLOW}$total_versions${NC} versions."
+        echo -e "${GREEN}[+]${NC} ${YELLOW}$formatted_time${NC} to save ${YELLOW}$total_versions${NC} versions."
     else
         echo -e "${RED}[!]${NC} There is no api.txt in ${YELLOW}$waybackurls_files${NC}"
     fi
@@ -768,16 +756,45 @@ get_api_response() {
     elapsed=$((end - start))
     formatted_time=$(format_time "$elapsed")
 
-    echo -e "${GREEN}[+]${NC} Took ${YELLOW}$formatted_time${NC} to download API responses."
+    echo -e "${GREEN}[+]${NC} ${YELLOW}$formatted_time${NC} to download API responses."
 }
 
-remove_api_responses_by_bytes() {
-    echo "Remove by bytes <= 250 delete"
+remove_small_api_responses() {
+    echo -e "${FUCHSIA}[*]${NC} Content of small files are stored in ${YELLOW}$small_api_responses${NC} before removing."
+    echo -e "${YELLOW}[?] ${NC} How big is the maximum byte to remove a file later: "
+    read -r max_bytes
+    find "$api_responses" -type f -size -"${max_bytes}c" -exec sh -c 'cat "{}" >> "$1" && echo -e "\n--- End of File ---\n" >> "$1"' _ "$small_api_responses" \;
+    echo -e "${GREEN}[+]${NC} All files with a size of ${YELLOW}<= ${max_bytes} bytes${NC} have been saved to ${YELLOW}$small_api_responses${NC}"
+    
+    while true; do
+        echo -e "${YELLOW}[?]${NC} Do you still want to remove the files? (y/N):"
+        read -r answer
+
+        answer=${answer:-n}
+
+        if [[ "$answer2" =~ ^[Yy]$ ]]; then
+            find "$api_responses" -type f -size -"${max_bytes}c" -exec rm {} \;
+            echo -e "${GREEN}[+]${NC} All files in ${YELLOW}${api_responses}${NC} with size of ${YELLOW}<= ${max_bytes} bytes${NC} have been removed."
+            break
+        else
+            echo -e "${BLUE}[i]${NC} No not today."
+        fi
+    done
 }
 
-# Check for prototype pollution
-check_prototype_pollution() {
-    echo "checking for prototype pollution..."
+check_with_nikto() {
+    echo -e "${RED}[i]${NC} Active scan..."
+    echo -e "${FUCHSIA}[*]${NC} Checking for vulnerabilities with nikto..."
+    sudo sed -i "s/^USERAGENT=.*/USERAGENT=Mozilla\/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit\/537.36 (KHTML, like Gecko) Chrome\/74.0.3729.169 Safari\/537.36 $BUGBOUNTY_USER/" /etc/nikto.conf
+
+    start=$(date +%s)
+    nikto -h "$target" -Pause "$DELAY" -o "$output_html_nikto" -Format htm
+    end=$(date +%s)
+
+    elapsed=$((end - start))
+    formatted_time=$(format_time "$elapsed")
+
+    echo -e "${GREEN}[+]${NC} ${YELLOW}$formatted_time${NC} to scan with nikto. Report is generated under ${YELLOW}$output_html_nikto${NC}"
 }
 
 import_in_burp() {
@@ -825,7 +842,7 @@ take_screenshots() {
     elapsed=$((end - start))
     formatted_time=$(format_time "$elapsed")
 
-    echo -e "${BLUE}[i]${NC} Took ${YELLOW}$formatted_time${NC} to shoot ${YELLOW}$total_files${NC} screenshots."
+    echo -e "${BLUE}[i]${NC} ${YELLOW}$formatted_time${NC} to shoot ${YELLOW}$total_files${NC} screenshots."
 }
 
 generate_html_screenshots() {
@@ -936,7 +953,7 @@ get_open_ports() {
     elapsed=$((end - start))
     formatted_time=$(format_time "$elapsed")
 
-    echo -e "${GREEN}[+]${NC} Took ${YELLOW}$formatted_time${NC} to scan $total_ips IPs with nmap."
+    echo -e "${GREEN}[+]${NC} ${YELLOW}$formatted_time${NC} to scan $total_ips IPs with nmap."
 }
 
 generate_html_open_ports() {
@@ -1060,13 +1077,14 @@ remove_directories() {
 }
 
 display_banner() {
-    echo -e "${FUCHSIA}===================================================="
+    echo -e "${FUCHSIA}====================================================${NC}"
+    echo -e "                ${YELLOW}Pentester Recon Tool${NC}"
     echo ""
-    echo "                 Pentester Recon Tool"
-    echo "                     Version $VERSION"
-    echo "          Created by SirOcram aka 0xFF00FF"
-    echo -e "       For domain: ${YELLOW}$target${NC}"
+    echo -e "${FUCHSIA}Version:${NC} ${YELLOW}$VERSION${NC}"
+    echo -e "${FUCHSIA}Created by${NC} ${YELLOW}SirOcram aka${NC} ${FUCHSIA}0xFF00FF"
+    echo -e "For domain: ${YELLOW}$target${NC}"
     echo -e "${FUCHSIA}Bugbounty header:${NC} ${YELLOW}$BUGBOUNTY_USER${NC}"
+    echo -e "${FUCHSIA}Delay:${NC} ${YELLOW}${DELAY}ms${NC}"
     echo ""
 }
 
@@ -1092,6 +1110,9 @@ while true; do
                 echo -e "${FUCHSIA}1.${NC} Get all subdomains (assetfinder, subfinder, sublist3r)"
                 echo -e "${FUCHSIA}2.${NC} Get theHarvester entries"
                 echo -e "${FUCHSIA}3.${NC} Get WaybackURLs"
+                echo -e "${FUCHSIA}4.${NC} Get API versions"
+                echo -e "${FUCHSIA}5.${NC} Get API response"
+                echo -e "${FUCHSIA}6.${NC} Remove small API responses"
                 echo -e "${FUCHSIA}x.${NC} Back to Main Menu"
                 read -p "Select an option: " subdomain_option
 
@@ -1099,6 +1120,9 @@ while true; do
                     1) get_subdomains ;;
                     2) get_theharvester_data ;;
                     3) get_wayback_urls ;;
+                    4) get_api_versions ;;
+                    5) get_api_response ;;
+                    6) remove_small_api_responses ;;
                     x) break ;;
                     *) echo -e "${RED}[!]${NC} Invalid option." ;;
                 esac
@@ -1112,9 +1136,6 @@ while true; do
                 echo -e "${FUCHSIA}1.${NC} Handle redirects"
                 echo -e "${FUCHSIA}2.${NC} Check scopes"
                 echo -e "${FUCHSIA}3.${NC} Check for live domains (httprobe)"
-                echo -e "${FUCHSIA}4.${NC} Get URL parameters for dalfox (paramspider)"
-                echo -e "${FUCHSIA}5.${NC} Get API version"
-                echo -e "${FUCHSIA}6.${NC} Get API response"
                 echo -e "${FUCHSIA}x.${NC} Back to Main Menu"
                 read -p "Select an option: " domain_option
 
@@ -1122,9 +1143,6 @@ while true; do
                     1) handle_redirects ;;
                     2) check_scopes ;;
                     3) check_live_domains ;;
-                    4) get_parameters ;;
-                    5) get_api_version ;;
-                    6) get_api_response ;;
                     x) break ;;
                     *) echo -e "${RED}[!]${NC} Invalid option." ;;
                 esac
@@ -1136,15 +1154,15 @@ while true; do
 
                 echo -e "${FUCHSIA}================== Security Tests ==================${NC}"
                 echo -e "${FUCHSIA}1.${NC} Check CSP"
-                echo -e "${FUCHSIA}2.${NC} Check XSS with Dalfox"
-                echo -e "${FUCHSIA}3.${NC} Check for prototype pollution"
+                echo -e "${FUCHSIA}2.${NC} Check XSS with dalfox"
+                echo -e "${FUCHSIA}3.${NC} Check for vulnerabilities with nikto"
                 echo -e "${FUCHSIA}x.${NC} Back to Main Menu"
                 read -p "Select an option: " security_option
 
                 case $security_option in
                     1) check_csp ;;
                     2) check_xss ;;
-                    3) check_prototype_pollution ;;
+                    3) check_with_nikto ;;
                     x) break ;;
                     *) echo -e "${RED}[!]${NC} Invalid option." ;;
                 esac
