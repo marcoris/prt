@@ -5,6 +5,46 @@
 ./prt.sh <url>
 ```
 
+### ToDos
+- [ ] Include spd-say "text" after a task is finished
+- [x] Subdomain Enumeration and Reconnaissance
+    - [x] Get all subdomains (assetfinder, subfinder, sublist3r)
+    - [x] Get theHarvester entries
+    - [x] Get WaybackURLs
+- [x] Domain Check and Scope Handling
+    - [x] Handle redirects
+    - [ ] Check scopes (have to check if format is IP/range or *.domain.tld)
+    - [x] Check for live domains (httprobe)
+    - [x] Get URL parameters for dalfox (paramspider)
+    - [x] Get API version
+    - [x] Get API response
+- [ ] Security Tests
+    - [x] Check CSP
+    - [x] Check XSS with Dalfox
+    - [ ] Check for prototype pollution
+- [ ] Reporting and Import
+    - [x] Generate report of CSP
+    - [x] Generate report of XSS
+    - [x] Take screenshots (gowitness)
+    - [x] Generate HTML output of screenshots
+    - [x] Import into Burp Suite
+    - [x] Quick host up check (IP/range nmap)
+    - [x] Generate HTML output of up hosts
+    - [x] Get open ports (nmap)
+    - [x] Generate report of open ports
+    - [x] Check for downloads
+    - [ ] Generate preview of downloads
+- [x] Cleanup
+    - [x] Cleanup all files
+    - [x] Cleanup domains
+    - [x] Cleanup downloads
+    - [x] Cleanup nmap
+    - [x] Cleanup screenshots
+    - [x] Cleanup security
+    - [x] Cleanup theHarvester
+    - [x] Cleanup waybackURLs
+    - [x] Cleanup APIs
+
 ### Main Menu
 ```
 ==================== Main Menu =====================
@@ -88,42 +128,3 @@ x. Back to Main Menu
 
 ## Workflow
 ![PentesterReconTool drawio](https://github.com/user-attachments/assets/6e625999-1331-4d0d-950a-22f25b238d87)
-
-### ToDos
-- [x] Subdomain Enumeration and Reconnaissance
-    - [x] Get all subdomains (assetfinder, subfinder, sublist3r)
-    - [x] Get theHarvester entries
-    - [x] Get WaybackURLs
-- [x] Domain Check and Scope Handling
-    - [x] Handle redirects
-    - [x] Check scopes
-    - [x] Check for live domains (httprobe)
-    - [x] Get URL parameters for dalfox (paramspider)
-    - [x] Get API version
-    - [x] Get API response
-- [ ] Security Tests
-    - [x] Check CSP
-    - [x] Check XSS with Dalfox
-    - [ ] Check for prototype pollution
-- [ ] Reporting and Import
-    - [x] Generate report of CSP
-    - [x] Generate report of XSS
-    - [x] Take screenshots (gowitness)
-    - [x] Generate HTML output of screenshots
-    - [x] Import into Burp Suite
-    - [x] Quick host up check (IP/range nmap)
-    - [x] Generate HTML output of up hosts
-    - [x] Get open ports (nmap)
-    - [x] Generate report of open ports
-    - [x] Check for downloads
-    - [ ] Generate preview of downloads
-- [x] Cleanup
-    - [x] Cleanup all files
-    - [x] Cleanup domains
-    - [x] Cleanup downloads
-    - [x] Cleanup nmap
-    - [x] Cleanup screenshots
-    - [x] Cleanup security
-    - [x] Cleanup theHarvester
-    - [x] Cleanup waybackURLs
-    - [x] Cleanup APIs
