@@ -77,11 +77,11 @@ format_time() {
     if (( seconds < 60 )); then
         echo -e "Took ${YELLOW}${secs} seconds${NC}"
     elif (( seconds < 3600 )); then
-        echo -e "Took ${YELLOW}${minutes} minutes and ${secs} seconds${NC}"
+        echo -e "Took ${YELLOW}${minutes} minutes${NC} and ${YELLOW}${secs} seconds${NC}"
     elif (( seconds < 86400 )); then
-        echo -e "Took ${YELLOW}${hours} hours ${minutes} minutes and ${secs} seconds${NC}"
+        echo -e "Took ${YELLOW}${hours} hours ${minutes} minutes${NC} and ${YELLOW}${secs} seconds${NC}"
     else
-        echo -e "Took ${YELLOW}${days} days ${hours} hours ${minutes} minutes and ${secs} seconds${NC}"
+        echo -e "Took ${YELLOW}${days} days ${hours} hours ${minutes} minutes${NC} and ${YELLOW}${secs} seconds${NC}"
     fi
 }
 
@@ -106,7 +106,7 @@ screenshots="../${BUGBOUNTY_DIR}/$target/screenshots/"
 api_files="../${BUGBOUNTY_DIR}/$target/api/"
 api_versions="${api_files}versions/"
 api_responses="${api_files}responses/"
-small_api_responses="../${BUGBOUNTY_DIR}/$target/api/small_api_responses.txt"
+small_api_responses="../${BUGBOUNTY_DIR}/$target/api/small_api_responses.json"
 security="../${BUGBOUNTY_DIR}/$target/security/"
 xss_files="${security}xss/"
 csp_files="${security}csp/"
@@ -509,6 +509,10 @@ check_scopes() {
 	fi
 
 	while IFS= read -r subdomain; do
+        if [[ -z "$subdomain" ]]; then
+            continue
+        fi
+
         ip=$(dig +short "$subdomain")
 
         if [[ -z "$ip" ]]; then
@@ -516,24 +520,68 @@ check_scopes() {
             continue
         fi
 
-        if [[ -s "$in_scope" ]]; then
-            if echo "$ip" | grepcidr -f "$in_scope" > /dev/null; then
-                echo "$subdomain" >> "$in_scope_results"
+        in_scope_match=false
+        out_of_scope_match=false
+
+        while IFS= read -r scope_entry; do
+            if [[ "$scope_entry" =~ ^\*\. ]]; then
+                scope_domain=${scope_entry#\*\.}
+                resolved_ip=$(resolve_domain "$scope_domain")
+                if [[ "$subdomain" == *"$scope_domain" ]] || echo "$ip" | grep -q "$resolved_ip"; then
+                    in_scope_match=true
+                    break
+                fi
+            elif [[ "$scope_entry" =~ ^https?:// ]]; then
+                scope_domain=$(echo "$scope_entry" | sed -E 's|https?://([^/]+).*|\1|')
+                resolved_ip=$(resolve_domain "$scope_domain")
+                if [[ "$subdomain" == "$scope_domain" ]] || echo "$ip" | grep -q "$resolved_ip"; then
+                    in_scope_match=true
+                    break
+                fi
             else
-                if [[ -s "$out_of_scope" ]] && echo "$ip" | grepcidr -f "$out_of_scope" > /dev/null; then
-                    echo "$subdomain" >> "$out_of_scope_results"
-                else
-                    echo "$subdomain" >> "$in_scope_results"
+                resolved_ip=$(resolve_domain "$scope_entry")
+                if [[ "$subdomain" == "$scope_entry" ]] || echo "$ip" | grep -q "$resolved_ip"; then
+                    in_scope_match=true
+                    break
                 fi
             fi
-        else
-            if [[ -s "$out_of_scope" ]] && echo "$ip" | grepcidr -f "$out_of_scope" > /dev/null; then
-                echo "$subdomain" >> "$out_of_scope_results"
-            else
-                echo "$subdomain" >> "$in_scope_results"
-            fi
+        done < "$in_scope"
+
+        if ! $in_scope_match; then
+            while IFS= read -r scope_entry; do
+                if [[ "$scope_entry" =~ ^\*\. ]]; then
+                    scope_domain=${scope_entry#\*\.}
+                    resolved_ip=$(resolve_domain "$scope_domain")
+                    if [[ "$subdomain" == *"$scope_domain" ]] || echo "$ip" | grep -q "$resolved_ip"; then
+                        out_of_scope_match=true
+                        break
+                    fi
+                elif [[ "$scope_entry" =~ ^https?:// ]]; then
+                    scope_domain=$(echo "$scope_entry" | sed -E 's|https?://([^/]+).*|\1|')
+                    resolved_ip=$(resolve_domain "$scope_domain")
+                    if [[ "$subdomain" == "$scope_domain" ]] || echo "$ip" | grep -q "$resolved_ip"; then
+                        out_of_scope_match=true
+                        break
+                    fi
+                else
+                    resolved_ip=$(resolve_domain "$scope_entry")
+                    if ip_in_range "$resolved_ip" "$scope_entry"; then
+                        out_of_scope_match=true
+                        break
+                    fi
+                fi
+            done < "$out_of_scope"
         fi
-	done < "$target_redirect_for_scope_domains"
+
+        if $in_scope_match; then
+            echo "$subdomain" >> "$in_scope_results"
+        elif $out_of_scope_match; then
+            echo "$subdomain" >> "$out_of_scope_results"
+        else
+            echo "$subdomain" >> "$in_scope_results"
+        fi
+
+    done < "$target_redirect_for_scope_domains"
     
 	total_in_scope_domains=$(wc -l < "$in_scope_results")
 	total_out_scope_domains=$(wc -l < "$out_of_scope_results")
@@ -542,6 +590,21 @@ check_scopes() {
 	echo -e "${GREEN}[+]${NC} ${YELLOW}$total_in_scope_domains${NC} Subdomains are in scope."
 	echo -e "${GREEN}[+]${NC} ${YELLOW}$total_out_scope_domains${NC} Subdomains are not in scope."
 	echo -e "${GREEN}[+]${NC} ${YELLOW}$total_no_data_domains${NC} Subdomains are not callable."
+}
+
+resolve_domain() {
+    local domain=$1
+    if [[ "$domain" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "$domain"
+    else
+        dig +short "$domain" | grep -E "^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$"
+    fi
+}
+
+ip_in_range() {
+    local ip=$1
+    local range=$2
+    ipcalc -n -c "$ip" "$range" | grep -q "NETWORK" && return 0 || return 1
 }
 
 check_xss() {
@@ -723,11 +786,11 @@ get_api_response() {
             ((api_scans++))
             echo -e "${FUCHSIA}[*]${NC} Checking ${YELLOW}$url${NC}"
             USERAGENT=$(rotate_user_agent)
-            response=$(curl -H "User-Agent: $USERAGENT" --connect-timeout 10 -sS -i "$url")
+            response=$(curl -sS -D - -H "User-Agent: $USERAGENT" --connect-timeout 10 "$url")
             content_type=$(echo "$response" | grep -i "Content-Type:" | cut -d' ' -f2 | tr -d '\r')
             
-            if [[ "$content_type" == "application/json" ]]; then
-                body=$(echo "$response" | tail -n 1)
+            if [[ "$content_type" == application/json* ]]; then
+                body=$(echo "$response" | sed -n '/^\r$/,$p' | tail -n +2)
                 echo "$body" | jq empty > /dev/null 2>&1
                 if [[ $? -eq 0 ]]; then
                     ((api_count++))
@@ -745,7 +808,7 @@ get_api_response() {
             fi
 
             if (( api_scans % 10 == 0 )); then
-                echo -e "${GREEN}[+]${NC} Scanned ${GREEN}$api_scans${NC} URLs ${GREEN}$api_count JSON files${NC} downloaded so far. Still ${GREEN}$total_apis${NC} to check..."
+                echo -e "${BLUE}[i]${NC} Scanned ${GREEN}$api_scans${NC} URLs ${GREEN}$api_count JSON files${NC} downloaded so far. Still ${GREEN}$total_apis${NC} to check..."
             fi
 
             sleep $(awk "BEGIN {printf \"%.2f\", $DELAY/1000}")
@@ -763,8 +826,37 @@ remove_small_api_responses() {
     echo -e "${FUCHSIA}[*]${NC} Content of small files are stored in ${YELLOW}$small_api_responses${NC} before removing."
     echo -e "${YELLOW}[?] ${NC} How big is the maximum byte to remove a file later: "
     read -r max_bytes
-    find "$api_responses" -type f -size -"${max_bytes}c" -exec sh -c 'cat "{}" >> "$1" && echo -e "\n--- End of File ---\n" >> "$1"' _ "$small_api_responses" \;
+    > "$small_api_responses"
+    find "$api_responses" -type f -size -"${max_bytes}c" -exec cat "{}" + | jq -s '.' > "$small_api_responses"
     echo -e "${GREEN}[+]${NC} All files with a size of ${YELLOW}<= ${max_bytes} bytes${NC} have been saved to ${YELLOW}$small_api_responses${NC}"
+
+    chunk_prefix="chunk_"
+    chunk_size=500000
+
+    if [[ -f "$small_api_responses" && $(stat -c%s "$small_api_responses") -gt $chunk_size ]]; then
+        echo -e "${BLUE}[i]${NC} The file ${YELLOW}$small_api_responses${NC} is larger than ${YELLOW}$chunk_size bytes${NC}. Splitting into chunks..."
+
+        total_elements=$(jq '. | length' "$small_api_responses")
+        if [[ "$total_elements" -eq 0 ]]; then
+            echo -e "${BLUE}[i]${NC} The JSON file contains no data. Exiting."
+            exit 1
+        fi
+
+        elements_per_chunk=$((chunk_size / ($(stat -c%s "$small_api_responses") / total_elements)))
+        if [[ "$elements_per_chunk" -eq 0 ]]; then
+            elements_per_chunk=1
+        fi
+        echo -e "${BLUE}[i]${NC} Maximum number of elements per chunk: ${YELLOW}$elements_per_chunk${NC}"
+
+        for ((i = 0; i < total_elements; i += elements_per_chunk)); do
+            chunk_file="${chunk_prefix}$(printf "%04d" $((i / elements_per_chunk))).json"
+            jq ".[$i:$((i + elements_per_chunk))]" "$small_api_responses" > "${api_files}$chunk_file"
+        done
+        
+        echo -e "${GREEN}[+]${NC} Chunks have been created."
+    else
+        echo "${BLUE}[i]${NC} The file '$small_api_responses' is smaller than $chunk_size bytes. No action required."
+    fi
     
     while true; do
         echo -e "${YELLOW}[?]${NC} Do you still want to remove the files? (y/N):"
@@ -772,12 +864,15 @@ remove_small_api_responses() {
 
         answer=${answer:-n}
 
-        if [[ "$answer2" =~ ^[Yy]$ ]]; then
+        if [[ "$answer" =~ ^[Yy]$ ]]; then
             find "$api_responses" -type f -size -"${max_bytes}c" -exec rm {} \;
+            rm $small_api_responses
+            rm "${chunk_prefix}"*.json
             echo -e "${GREEN}[+]${NC} All files in ${YELLOW}${api_responses}${NC} with size of ${YELLOW}<= ${max_bytes} bytes${NC} have been removed."
             break
         else
             echo -e "${BLUE}[i]${NC} No not today."
+            break
         fi
     done
 }
@@ -785,10 +880,17 @@ remove_small_api_responses() {
 check_with_nikto() {
     echo -e "${RED}[i]${NC} Active scan..."
     echo -e "${FUCHSIA}[*]${NC} Checking for vulnerabilities with nikto..."
-    sudo sed -i "s/^USERAGENT=.*/USERAGENT=Mozilla\/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit\/537.36 (KHTML, like Gecko) Chrome\/74.0.3729.169 Safari\/537.36 $BUGBOUNTY_USER/" /etc/nikto.conf
+
+    USERAGENT=$(rotate_user_agent)
+    escaped_useragent=$(echo "$USERAGENT" | sed 's/\//\\\//g')
+
+    sudo sed -i "s/^USERAGENT=.*/USERAGENT=$escaped_useragent/" /etc/nikto.conf
 
     start=$(date +%s)
-    nikto -h "$target" -Pause "$DELAY" -o "$output_html_nikto" -Format htm
+    for subdomain in $(cat "$target_live_domains"); do
+        echo -e "${FUCHSIA}[*]${NC} Scanning ${YELLOW}$subdomain${NC}..."
+        nikto -h "$subdomain" -Pause "$DELAY" -o "$output_html_nikto" -Format htm
+    done
     end=$(date +%s)
 
     elapsed=$((end - start))
