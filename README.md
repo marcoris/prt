@@ -13,7 +13,7 @@
     - [x] Get WaybackURLs
 - [x] Domain Check and Scope Handling
     - [x] Handle redirects
-    - [ ] Check scopes (have to check if format is IP/range or *.domain.tld)
+    - [x] Check scopes (have to check if format is IP/range or *.domain.tld)
     - [x] Check for live domains (httprobe)
     - [x] Get URL parameters for dalfox (paramspider)
     - [x] Get API version
