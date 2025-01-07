@@ -21,7 +21,6 @@ allowed_extensions=($(merge_arrays))
 
 tools=(
     assetfinder
-    csp
     dalfox
     dig
     grepcidr
