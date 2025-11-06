@@ -147,6 +147,15 @@ mkdir -p $csp_no_file
 mkdir -p $xss_files
 mkdir -p $csp_files
 
+if [[ ! -f "$in_scope" || ! -f "$out_of_scope" ]]; then
+	echo -e "${RED}[!]${NC} in_scope.txt or out_of_scope.txt is missing!"
+    echo -e "${GREEN}[+]${NC} Creating scope files..."
+    echo -e "${BLUE}[!]${NC} You have to edit them under $in_scope and $out_of_scope"
+    echo "127.0.0.1" > $in_scope
+    echo "127.0.0.1" > $out_of_scope
+    exit 1
+fi
+
 get_subdomains() {    
     > $target_sub_domains
     
