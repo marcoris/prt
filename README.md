@@ -31,6 +31,7 @@
     - [x] Quick host up check (IP/range nmap)
     - [x] Generate HTML output of up hosts
     - [x] Get open ports (nmap)
+    - [ ] xsltproc target.xml -o target.html ==> nmap ... -oX target => export xml to html
     - [x] Generate report of open ports
     - [x] Check for downloads
     - [ ] Generate preview of downloads
